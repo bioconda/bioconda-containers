@@ -54,7 +54,7 @@ jobs:
         glibc_version="$( printf %s "${glibc}" | sed -E 's/.*version ([0-9.]*[0-9]).*/\1/' )"
         busybox_version="$( printf %s "${busybox}" | sed -E '1 s/.*v([0-9.]*[0-9]).*/\1/' )"
         bash_version="$( printf %s "${bash}" | sed -E 's/.*version ([0-9.]*[0-9]).*/\1/' )"
-        image='bioconda/${{ env.IMAGE_NAME }}'
+        image='${{ env.IMAGE_NAME }}'
         tag="${glibc_version}_${busybox_version}_${bash_version}"
         buildah commit "${container}" "${image}:${tag}"
         buildah rm "${container}"
