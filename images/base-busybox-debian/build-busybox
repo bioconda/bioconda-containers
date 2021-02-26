@@ -1,0 +1,51 @@
+#! /bin/sh
+set -xeu
+
+version="${1}"
+shift
+work="${1}"
+shift
+
+mkdir -p "${work}"
+cd "${work}"
+
+curl -L \
+  "https://busybox.net/downloads/busybox-${busybox_version}.tar.bz2" \
+  | tar -xjf- --strip-components=1
+
+make defconfig
+mv .config .defconfig
+# Set CONFIG_SUBST_WCHAR=0 for better Unicode support and remove big components.
+printf %s\\n \
+  CONFIG_SUBST_WCHAR=0 \
+  CONFIG_RPM=n \
+  CONFIG_RPM2CPIO=n \
+  CONFIG_FSCK_MINIX=n \
+  CONFIG_MKFS_MINIX=n \
+  CONFIG_BC=n \
+  CONFIG_DC=n \
+  CONFIG_HDPARM=n \
+  CONFIG_HEXEDIT=n \
+  CONFIG_I2CGET=n \
+  CONFIG_I2CSET=n \
+  CONFIG_I2CDUMP=n \
+  CONFIG_I2CDETECT=n \
+  CONFIG_I2CTRANSFER=n \
+  CONFIG_DNSD=n \
+  CONFIG_FTPD=n \
+  CONFIG_HTTPD=n \
+  CONFIG_TCPSVD=n \
+  CONFIG_UDPSVD=n \
+  CONFIG_UDHCPD=n \
+  CONFIG_SH_IS_ASH=n \
+  CONFIG_SH_IS_NONE=y \
+  CONFIG_SHELL_ASH=n \
+  CONFIG_ASH=n \
+  CONFIG_HUSH=n \
+  CONFIG_SHELL_HUSH=n \
+  | cat - .defconfig \
+  > .config
+# make still asks for choosing a although CONFIG_SH_IS_NONE=y is set!?
+printf \\n | make oldconfig
+
+make -j "$( nproc )" busybox
