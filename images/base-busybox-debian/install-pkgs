@@ -152,7 +152,7 @@ get_deps() {
 
   local ignore_pkgs
   ignore_pkgs="$(
-    printf %s\\n base-files '<awk>' debianutils dash 
+    printf %s\\n base-files '<awk>' debianutils dash \
       | grep -vFx "$( printf %s\\n "${@}" )"
   )"
   [ -f "${root_fs}/.pkg.lst" ] && \
