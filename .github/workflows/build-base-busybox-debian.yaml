@@ -1,0 +1,89 @@
+name: Build and Push Image "base-busybox-debian"
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: Build and push image
+    runs-on: ubuntu-20.04
+    env:
+      BUSYBOX_VERSION=1.32.1
+      DEBIAN_VERSION=10
+      IMAGE_NAME: base-busybox-debian
+      TEST_COMMAND: |
+        bash -c '\
+          wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && \
+          sh ./Miniconda3-latest-Linux-x86_64.sh -bp /opt/conda && \
+          /opt/conda/bin/conda info --all'
+
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Build Image
+      id: buildah-build
+      run: |
+        set -xeu
+        cd 'images/${{ env.IMAGE_NAME }}'
+
+        iidfile="$( mktemp )"
+        buildah bud --layers \
+          --iidfile="${iidfile}" \
+          --build-arg=busybox_version="${{ env.BUSYBOX_VERSION }}" \
+          --build-arg=debian_version="${{ env.DEBIAN_VERSION }}"
+        image_id="$( cat "${iidfile}" )"
+        rm "${iidfile}"
+
+        container="$( buildah from "${image_id}" )"
+        run() { buildah run "${container}" "${@}" ; }
+        deb_list="$( run "${container}" cat /.deb.lst )"
+        pkg_list="$( run "${container}" cat /.pkg.lst )"
+        glibc="$( run sh -c 'exec "$( find /lib -name libc.so.6 -print -quit )"' | sed '1!d' )"
+        busybox="$( run busybox | sed '1!d' )"
+        bash="$( run bash --version | sed '1!d' )"
+        buildah rm "${container}"
+
+        container="$( buildah from "${image_id}" )"
+        buildah config --label=glibc="${glibc}" "${container}"
+        buildah config --label=busybox="${busybox}" "${container}"
+        buildah config --label=deb-list="${deb_list}" "${container}"
+        buildah config --label=pkg-list="${pkg_list}" "${container}"
+
+        glibc_version="$( printf %s "${glibc}" | sed -E 's/.*version ([0-9.]*[0-9]).*/\1/' )"
+        busybox_version="$( printf %s "${busybox}" | sed -E '1 s/.*v([0-9.]*[0-9]).*/\1/' )"
+        bash_version="$( printf %s "${bash}" | sed -E 's/.*version ([0-9.]*[0-9]).*/\1/' )"
+        image='bioconda/${{ env.IMAGE_NAME }}'
+        tag="${glibc_version}_${busybox_version}_${bash_version}"
+        buildah commit "${container}" "${image}:${tag}"
+        buildah rm "${container}"
+        buildah tag "${image}":"${tag}" "${image}":latest
+
+        echo "::set-output name=image::${image}"
+        echo "::set-output name=tags::${tag} latest"
+
+    - name: Test built image
+      run: |
+        for tag in ${{ steps.buildah-build.outputs.tags }} ; do
+          podman run --rm \
+            "${{ steps.buildah-build.outputs.image }}:${tag}" \
+            ${{ env.TEST_COMMAND }}
+        done
+
+    - if: ${{ github.ref == 'refs/heads/main' }}
+      name: Push To Quay
+      uses: redhat-actions/push-to-registry@v2
+      with:
+        image: ${{ steps.buildah-build.outputs.image }}
+        tags: ${{ steps.buildah-build.outputs.tags }}
+        registry: ${{ secrets.QUAY_BIOCONDA_REPO }}
+        username: ${{ secrets.QUAY_BIOCONDA_USERNAME }}
+        password: ${{ secrets.QUAY_BIOCONDA_TOKEN }}
+
+    - if: ${{ github.ref == 'refs/heads/main' }}
+      name: Test uploaded image
+      env:
+        images: "${{ join(fromJSON(steps.push-to-quay.outputs.registry-paths), ' ') }}"
+      run: |
+        for image in ${images} ; do \
+          podman run --rm "${image}" \
+            ${{ env.TEST_COMMAND }}
+        done
