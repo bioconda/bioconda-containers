@@ -84,8 +84,8 @@ jobs:
     - if: ${{ github.ref == 'refs/heads/main' }}
       name: Test uploaded image
       run: |
-        echo "${{ steps.push-to-quay.outputs.registry-paths }}"
-        #for image in ${images} ; do \
-        #  podman run --rm "${image}" \
-        #    ${{ env.TEST_COMMAND }}
-        #done
+        image='${{ secrets.QUAY_BIOCONDA_REPO }}/${{ steps.buildah-build.outputs.image }}'
+        for tag in ${{ steps.buildah-build.outputs.tags }} ; do
+          podman run --rm "${image}:${tag}" \
+            ${{ env.TEST_COMMAND }}
+        done
