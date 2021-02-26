@@ -1,13 +1,16 @@
 name: Build and Push Image "base-busybox-debian"
-on: [push, pull_request]
+on:
+  push:
+    branch: main
+  pull_request:
 
 jobs:
   build:
     name: Build and push image
     runs-on: ubuntu-20.04
     env:
-      BUSYBOX_VERSION=1.32.1
-      DEBIAN_VERSION=10
+      BUSYBOX_VERSION: 1.32.1
+      DEBIAN_VERSION: 10
       IMAGE_NAME: base-busybox-debian
       TEST_COMMAND: |
         bash -c '\
@@ -35,8 +38,8 @@ jobs:
 
         container="$( buildah from "${image_id}" )"
         run() { buildah run "${container}" "${@}" ; }
-        deb_list="$( run "${container}" cat /.deb.lst )"
-        pkg_list="$( run "${container}" cat /.pkg.lst )"
+        deb_list="$( run cat /.deb.lst )"
+        pkg_list="$( run cat /.pkg.lst )"
         glibc="$( run sh -c 'exec "$( find /lib -name libc.so.6 -print -quit )"' | sed '1!d' )"
         busybox="$( run busybox | sed '1!d' )"
         bash="$( run bash --version | sed '1!d' )"
@@ -80,10 +83,9 @@ jobs:
 
     - if: ${{ github.ref == 'refs/heads/main' }}
       name: Test uploaded image
-      env:
-        images: "${{ join(fromJSON(steps.push-to-quay.outputs.registry-paths), ' ') }}"
       run: |
-        for image in ${images} ; do \
-          podman run --rm "${image}" \
-            ${{ env.TEST_COMMAND }}
-        done
+        echo "${{ steps.push-to-quay.outputs.registry-paths }}"
+        #for image in ${images} ; do \
+        #  podman run --rm "${image}" \
+        #    ${{ env.TEST_COMMAND }}
+        #done
