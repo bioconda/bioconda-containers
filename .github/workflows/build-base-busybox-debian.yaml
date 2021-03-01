@@ -67,6 +67,23 @@ jobs:
         buildah rm "${container}"
         image_name='${{ env.IMAGE_NAME }}'
 
+        # FIX upstream: Quay.io does not support immutable images currently.
+        #               => Try to use the REST API to check for duplicate tags.
+        existing_tags="$(
+          curl -sL \
+            https://quay.io/api/v1/repository/bioconda/${image_name}/image \
+            | jq -r '.images[].tags[]'
+        )"
+        for tag in ${tags} ; do
+          test \! "${tag}" = latest && \
+            printf %s "${existing_tags}" \
+              | grep -qxF "${tag}" \
+            && {
+              printf 'Tag %s already exists!\n' "${tag}"
+              exit 1
+            }
+        done
+
         for tag in ${tags} ; do
           buildah tag "${image_id}" \
             "${image_name}":"${tag}"
