@@ -2,11 +2,17 @@ name: Build and Push Image "base-busybox-debian"
 on:
   push:
     branch: main
+    paths:
+    - images/base-busybox-debian/*
+    - .github/workflows/build-base-busybox-debian.yaml
   pull_request:
+    paths:
+    - images/base-busybox-debian/*
+    - .github/workflows/build-base-busybox-debian.yaml
 
 jobs:
   build:
-    name: Build and push image
+    name: Build and Push Image
     runs-on: ubuntu-20.04
     env:
       # The base image is not intended to change often and should be used with
@@ -92,7 +98,7 @@ jobs:
         echo "::set-output name=image::${image_name}"
         echo "::set-output name=tags::$( echo ${tags} )"
 
-    - name: Test built image
+    - name: Test Built Image
       run: |
         for tag in ${{ steps.buildah-build.outputs.tags }} ; do
           podman run --rm \
@@ -111,7 +117,7 @@ jobs:
         password: ${{ secrets.QUAY_BIOCONDA_TOKEN }}
 
     - if: ${{ github.ref == 'refs/heads/main' }}
-      name: Test uploaded image
+      name: Test Uploaded Image
       run: |
         image='${{ secrets.QUAY_BIOCONDA_REPO }}/${{ steps.buildah-build.outputs.image }}'
         for tag in ${{ steps.buildah-build.outputs.tags }} ; do
