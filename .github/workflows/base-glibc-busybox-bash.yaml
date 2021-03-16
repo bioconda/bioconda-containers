@@ -1,14 +1,14 @@
-name: Build and Push Image "base-busybox-debian"
+name: Build and Push Image "base-glibc-busybox-bash"
 on:
   push:
     branch: main
     paths:
-    - images/base-busybox-debian/*
-    - .github/workflows/build-base-busybox-debian.yaml
+    - images/base-glibc-busybox-bash/*
+    - .github/workflows/base-glibc-busybox-bash.yaml
   pull_request:
     paths:
-    - images/base-busybox-debian/*
-    - .github/workflows/build-base-busybox-debian.yaml
+    - images/base-glibc-busybox-bash/*
+    - .github/workflows/base-glibc-busybox-bash.yaml
 
 jobs:
   build:
@@ -18,7 +18,7 @@ jobs:
       # The base image is not intended to change often and should be used with
       # version tags or checksum IDs, but not via "latest".
       VERSION: 1.0.0
-      IMAGE_NAME: base-busybox-debian
+      IMAGE_NAME: base-glibc-busybox-bash
       BUSYBOX_VERSION: 1.32.1
       DEBIAN_VERSION: 10
       TEST_COMMAND: |
