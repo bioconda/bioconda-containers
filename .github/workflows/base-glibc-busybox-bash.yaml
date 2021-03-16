@@ -99,16 +99,17 @@ jobs:
         existing_tags="$(
           curl -sL \
             'https://quay.io/api/v1/repository/bioconda/${{ steps.buildah-build.outputs.image }}/image' \
-            | jq -r '.images[].tags[]'
+            | jq -r 'if .images == null then "" else .images[].tags[] end'
         )"
         for tag in ${{ steps.buildah-build.outputs.tags }} ; do
-          test \! "${tag}" = latest && \
+          if [ \! "${tag}" = latest ] ; then
             printf %s "${existing_tags}" \
               | grep -qxF "${tag}" \
             && {
               printf 'Tag %s already exists!\n' "${tag}"
               exit 1
             }
+          fi
         done
 
     - if: ${{ github.ref == 'refs/heads/main' }}
