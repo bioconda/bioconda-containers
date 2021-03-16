@@ -13,7 +13,8 @@ FROM "debian:${debian_version}-slim" AS build_base
 
 # Build busybox ourselves to have more fine-grained control over what we want
 # (or not want) to include.
-FROM build_base AS busybox_builder
+# Use old Debian version to ensure compatible (low glibc requirement) binaries.
+FROM debian:9-slim AS busybox_builder
 RUN apt-get update && \
     apt-get install -y \
       bzip2 curl ca-certificates tar gcc gnupg dirmngr make
