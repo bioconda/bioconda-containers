@@ -1,0 +1,40 @@
+#! /bin/sh -l
+# Uses a login shell to run /etc/profile beforehand.
+
+# Chain exec entrypoints in /opt/container/ (entrypoint-001, entrypoint-002, ...), if any.
+# E.g., if the container is run with command `bash`, the `exec` line below may expand to
+# `exec /opt/container/entrypoint-001 /opt/container/entrypoint-002 bash`.
+
+quote() {
+  IFS=\'
+  set -- ${1}\'
+  printf " '%s" "${1}"
+  shift
+  for i do
+    printf "'\\\\''%s" "${i}"
+  done
+  unset IFS
+}
+
+eval "set -- $(
+  (
+    LC_COLLATE=C
+    set -- /opt/container/entrypoint-[*] /opt/container/entrypoint-*
+    case "${1} ${2}" in
+      '/opt/container/entrypoint-[*] /opt/container/entrypoint-*')
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+    for entrypoint do
+      quote "${entrypoint}"
+    done
+  )
+  for arg do
+    quote "${arg}"
+  done
+)"
+
+exec "${@}"

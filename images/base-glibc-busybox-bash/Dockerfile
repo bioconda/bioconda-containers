@@ -59,5 +59,5 @@ COPY entrypoint ./opt/container/
 FROM scratch
 COPY --from=rootfs_builder /rootfs /
 ENV LANG=C.UTF-8
-ENTRYPOINT [ "/usr/bin/tini", "--" ]
-CMD [ "bash" ]
+ENTRYPOINT [ "/usr/bin/tini", "--", "/opt/container/entrypoint" ]
+CMD [ "bash" , "-l" ]
