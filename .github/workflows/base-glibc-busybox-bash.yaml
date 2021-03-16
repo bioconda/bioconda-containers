@@ -1,14 +1,14 @@
-name: Build and Push Image "base-busybox-debian"
+name: Build and Push Image "base-glibc-busybox-bash"
 on:
   push:
     branch: main
     paths:
-    - images/base-busybox-debian/*
-    - .github/workflows/build-base-busybox-debian.yaml
+    - images/base-glibc-busybox-bash/*
+    - .github/workflows/base-glibc-busybox-bash.yaml
   pull_request:
     paths:
-    - images/base-busybox-debian/*
-    - .github/workflows/build-base-busybox-debian.yaml
+    - images/base-glibc-busybox-bash/*
+    - .github/workflows/base-glibc-busybox-bash.yaml
 
 jobs:
   build:
@@ -17,10 +17,13 @@ jobs:
     env:
       # The base image is not intended to change often and should be used with
       # version tags or checksum IDs, but not via "latest".
-      VERSION: 1.0.0
-      IMAGE_NAME: base-busybox-debian
-      BUSYBOX_VERSION: 1.32.1
-      DEBIAN_VERSION: 10
+      VERSION: '1.0.0'
+      IMAGE_NAME: base-glibc-busybox-bash
+      BUSYBOX_VERSION: '1.32.1'
+      # Use Debian 9 instead of newer one for now to get an image which is more
+      # similar to the larger base image (which does not use Debian 10+ because
+      # of increased size due to additional dependencies pulled in for OpenGL).
+      DEBIAN_VERSION: '9.13'
       TEST_COMMAND: |
         bash -c '\
           wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && \
@@ -73,23 +76,6 @@ jobs:
         buildah rm "${container}"
         image_name='${{ env.IMAGE_NAME }}'
 
-        # FIX upstream: Quay.io does not support immutable images currently.
-        #               => Try to use the REST API to check for duplicate tags.
-        existing_tags="$(
-          curl -sL \
-            https://quay.io/api/v1/repository/bioconda/${image_name}/image \
-            | jq -r '.images[].tags[]'
-        )"
-        for tag in ${tags} ; do
-          test \! "${tag}" = latest && \
-            printf %s "${existing_tags}" \
-              | grep -qxF "${tag}" \
-            && {
-              printf 'Tag %s already exists!\n' "${tag}"
-              exit 1
-            }
-        done
-
         for tag in ${tags} ; do
           buildah tag "${image_id}" \
             "${image_name}":"${tag}"
@@ -104,6 +90,26 @@ jobs:
           podman run --rm \
             "${{ steps.buildah-build.outputs.image }}:${tag}" \
             ${{ env.TEST_COMMAND }}
+        done
+
+    - name: Check For Already Uploaded Tags
+      run: |
+        # FIX upstream: Quay.io does not support immutable images currently.
+        #               => Try to use the REST API to check for duplicate tags.
+        existing_tags="$(
+          curl -sL \
+            'https://quay.io/api/v1/repository/bioconda/${{ steps.buildah-build.outputs.image }}/image' \
+            | jq -r 'if .images == null then "" else .images[].tags[] end'
+        )"
+        for tag in ${{ steps.buildah-build.outputs.tags }} ; do
+          if [ \! "${tag}" = latest ] ; then
+            printf %s "${existing_tags}" \
+              | grep -qxF "${tag}" \
+            && {
+              printf 'Tag %s already exists!\n' "${tag}"
+              exit 1
+            }
+          fi
         done
 
     - if: ${{ github.ref == 'refs/heads/main' }}

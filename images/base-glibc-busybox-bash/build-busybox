@@ -17,6 +17,9 @@ make defconfig
 mv .config .defconfig
 # Set CONFIG_SUBST_WCHAR=0 for better Unicode support and remove big components.
 printf %s\\n \
+  CONFIG_AR=y \
+  CONFIG_FEATURE_AR_CREATE=y \
+  CONFIG_FEATURE_AR_LONG_FILENAMES=y \
   CONFIG_SUBST_WCHAR=0 \
   CONFIG_RPM=n \
   CONFIG_RPM2CPIO=n \

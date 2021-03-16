@@ -1,5 +1,5 @@
 ARG busybox_version=1.32.1
-ARG debian_version=10
+ARG debian_version=9
 
 # Don't use Debian's busybox package since it only provides a smaller subset of
 # BusyBox's functions (e.g., no administrative tools like adduser etc.).
@@ -13,7 +13,8 @@ FROM "debian:${debian_version}-slim" AS build_base
 
 # Build busybox ourselves to have more fine-grained control over what we want
 # (or not want) to include.
-FROM build_base AS busybox_builder
+# Use old Debian version to ensure compatible (low glibc requirement) binaries.
+FROM debian:9-slim AS busybox_builder
 RUN apt-get update && \
     apt-get install -y \
       bzip2 curl ca-certificates tar gcc gnupg dirmngr make
@@ -45,7 +46,18 @@ RUN rm -rf ./lib ./lib64
 COPY install-pkgs /usr/local/bin
 RUN install-pkgs "$( pwd )" /tmp/work bash ncurses-base libc-bin zlib1g
 
+ARG tini_version=0.19.0
+ADD "https://github.com/krallin/tini/releases/download/v${tini_version}/tini-amd64" ./usr/bin/tini
+RUN echo \
+      93dcc18adc78c65a028a84799ecf8ad40c936fdfc5f2a57b1acda5a8117fa82c\ ./usr/bin/tini \
+      | sha256sum --check \
+    && \
+    chmod +x ./usr/bin/tini
+COPY entrypoint ./opt/container/
+
+
 FROM scratch
 COPY --from=rootfs_builder /rootfs /
 ENV LANG=C.UTF-8
-CMD [ "bash" ]
+ENTRYPOINT [ "/usr/bin/tini", "--", "/opt/container/entrypoint" ]
+CMD [ "bash" , "-l" ]

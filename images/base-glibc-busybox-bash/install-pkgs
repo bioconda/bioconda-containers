@@ -90,6 +90,17 @@ postinst() {
       chroot ./ add-shell /bin/sh
       chroot ./ add-shell /bin/bash
       chroot ./ add-shell /bin/rbash
+      # Bash 4.* did not have default key bindings for control-arrow-key key
+      # combinations. Add some for convenience:
+      cat >> ./etc/inputrc <<'EOF'
+
+"\e[5C": forward-word
+"\e[5D": backward-word
+"\e\e[C": forward-word
+"\e\e[D": backward-word
+"\e[1;5C": forward-word
+"\e[1;5D": backward-word
+EOF
       ;;
     libc6|libgcc1|libcrypt1|libgcc-s1|libtinfo5|libtinfo6|zlib1g)
       postinst_ldconfig_trigger
