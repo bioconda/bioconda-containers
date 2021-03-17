@@ -1,5 +1,4 @@
-#! /bin/sh -l
-# Uses a login shell to run /etc/profile beforehand.
+#! /bin/sh
 
 # Chain exec entrypoints in /opt/container/ (entrypoint-001, entrypoint-002, ...), if any.
 # E.g., if the container is run with command `bash`, the `exec` line below may expand to
