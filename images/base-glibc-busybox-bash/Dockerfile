@@ -46,10 +46,7 @@ RUN rm -rf ./lib ./lib64
 COPY install-pkgs /usr/local/bin
 RUN install-pkgs "$( pwd )" /tmp/work bash ncurses-base libc-bin
 
-COPY entrypoint ./opt/container/
-
 FROM scratch
 COPY --from=rootfs_builder /rootfs /
 ENV LANG=C.UTF-8
-ENTRYPOINT [ "/opt/container/entrypoint" ]
 CMD [ "bash" , "-l" ]
