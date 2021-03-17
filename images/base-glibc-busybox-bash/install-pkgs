@@ -10,6 +10,24 @@ prepare_remove_docs() {
 }
 
 
+add_rpath() {
+  local binary="${1}"
+  shift
+  local new_rpath="${1}"
+  shift
+  local rpath
+  rpath="$(
+    patchelf \
+      --print-rpath \
+      "${binary}"
+  )"
+  patchelf \
+    --set-rpath \
+    "${rpath:+${rpath}:}${new_rpath}" \
+    "${binary}"
+}
+
+
 prepare() {
   local pkg="${1}"
   shift
@@ -17,7 +35,7 @@ prepare() {
   shift
 
   case "${pkg}" in
-    libc6)
+    libc6 )
       # To reduce image size, remove all charset conversion modules apart
       # from smaller ones for some common encodings.
       # Update gconv-modules accordingly.
@@ -44,13 +62,45 @@ prepare() {
       iconvconfig --prefix ./
 
       ;;
-    bash)
+    bash )
       rm -rf ./usr/share/locale
+      # Add custom rpath for libtinfo (see below) to bash binaries.
+      local new_rpath='/lib/x86_64-linux-gnu/terminfo:/usr/lib/x86_64-linux-gnu/terminfo'
+      add_rpath ./bin/bash "${new_rpath}"
+      add_rpath ./usr/bin/clear_console "${new_rpath}"
       ;;
-    libc-bin|libgcc1|base-files|gcc-6-base|gcc-8-base|gcc-10-base|libcrypt1|libgcc-s1|libtinfo5|libtinfo6|ncurses-base|zlib1g)
+    libtinfo5 | \
+    libtinfo6 )
+      # Move libtinfo libraries to a custom path to ensure it is not
+      # unintentionally used in downstream images.
+      find ./usr/lib/x86_64-linux-gnu -type f \
+        | {
+          while read binary ; do
+            add_rpath "${binary}" '/lib/x86_64-linux-gnu/terminfo'
+          done
+        }
+
+      mv ./lib/x86_64-linux-gnu ./temp
+      mkdir ./lib/x86_64-linux-gnu
+      mv ./temp ./lib/x86_64-linux-gnu/terminfo
+
+      mv ./usr/lib/x86_64-linux-gnu ./temp
+      mkdir ./usr/lib/x86_64-linux-gnu
+      mv ./temp ./usr/lib/x86_64-linux-gnu/terminfo
+      ;;
+    libc-bin | \
+    libgcc1 | \
+    base-files | \
+    gcc-6-base | \
+    gcc-8-base | \
+    gcc-10-base | \
+    libcrypt1 | \
+    libgcc-s1 | \
+    ncurses-base | \
+    zlib1g )
       :
       ;;
-    *)
+    * )
       # Abort if we get an unexpected package.
       printf %s\\n "\`prepare\` not defined for ${pkg}" >&2
       return 1
@@ -72,18 +122,18 @@ postinst() {
   shift
 
   case "${pkg}" in
-    libc-bin)
+    libc-bin )
       cp -p --remove-destination \
         ./usr/share/libc-bin/nsswitch.conf \
         ./etc/nsswitch.conf
         postinst_ldconfig_trigger
       ;;
-    base-files)
+    base-files )
       cp "${destdir}/DEBIAN/postinst" ./base-files-postinst
       chroot ./ sh /base-files-postinst configure
       rm ./base-files-postinst
       ;;
-    bash)
+    bash )
       # Replace BusyBox's sh by Bash
       rm -f ./bin/sh
       ln -s /bin/bash ./bin/sh
@@ -102,13 +152,22 @@ postinst() {
 "\e[1;5D": backward-word
 EOF
       ;;
-    libc6|libgcc1|libcrypt1|libgcc-s1|libtinfo5|libtinfo6|zlib1g)
+    libc6 | \
+    libgcc1 | \
+    libcrypt1 | \
+    libgcc-s1 | \
+    libtinfo5 | \
+    libtinfo6 | \
+    zlib1g )
       postinst_ldconfig_trigger
       ;;
-    gcc-6-base|gcc-8-base|gcc-10-base|ncurses-base)
+    gcc-6-base | \
+    gcc-8-base | \
+    gcc-10-base | \
+    ncurses-base )
       :
       ;;
-    *)
+    * )
       # Abort if we get an unexpected package.
       printf %s\\n "\`postinst\` not defined for ${pkg}" >&2
       return 1

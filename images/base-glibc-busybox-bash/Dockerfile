@@ -43,6 +43,12 @@ RUN mkdir -p \
 # Remove glibc files. They are incomplete and get substituted by `install-pkgs`.
 RUN rm -rf ./lib ./lib64
 
+# Install helper tools used by install-pkgs.
+RUN apt-get update -qq \
+    && \
+    apt-get install --yes --no-install-recommends \
+      patchelf
+
 COPY install-pkgs /usr/local/bin
 RUN install-pkgs "$( pwd )" /tmp/work bash ncurses-base libc-bin
 
