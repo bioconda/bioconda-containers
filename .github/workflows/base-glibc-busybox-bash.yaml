@@ -81,9 +81,15 @@ jobs:
     - name: Test Built Image
       run: |
         image='${{ steps.buildah-build.outputs.image }}'
-        for tag in ${{ steps.buildah-build.outputs.tags }} ; do
+        ids="$(
+          for tag in ${{ steps.buildah-build.outputs.tags }} ; do
+            buildah images --quiet --no-trunc "${image}:${tag}"
+          done
+          )"
+        ids="$( printf %s "${ids}" | sort -u )"
+        for id in ${ids} ; do
           buildah bud \
-            --build-arg=base="${image}:${tag}" \
+            --build-arg=base="${id}" \
             --file=Dockerfile.test \
             "images/${image}"
         done
@@ -134,10 +140,16 @@ jobs:
     - if: ${{ github.ref == 'refs/heads/main' }}
       name: Test Uploaded Image
       run: |
-        image='${{ secrets.QUAY_BIOCONDA_REPO }}/${{ steps.buildah-build.outputs.image }}'
-        for tag in ${{ steps.buildah-build.outputs.tags }} ; do
+        image='${{ steps.buildah-build.outputs.image }}'
+        ids="$(
+          for tag in ${{ steps.buildah-build.outputs.tags }} ; do
+            buildah images --quiet --no-trunc "${image}:${tag}"
+          done
+          )"
+        ids="$( printf %s "${ids}" | sort -u )"
+        for id in ${ids} ; do
           buildah bud \
-            --build-arg=base="${image}:${tag}" \
+            --build-arg=base="${id}" \
             --file=Dockerfile.test \
             "images/${image}"
         done
