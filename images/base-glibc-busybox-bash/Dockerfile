@@ -44,20 +44,12 @@ RUN mkdir -p \
 RUN rm -rf ./lib ./lib64
 
 COPY install-pkgs /usr/local/bin
-RUN install-pkgs "$( pwd )" /tmp/work bash ncurses-base libc-bin zlib1g
+RUN install-pkgs "$( pwd )" /tmp/work bash ncurses-base libc-bin
 
-ARG tini_version=0.19.0
-ADD "https://github.com/krallin/tini/releases/download/v${tini_version}/tini-amd64" ./usr/bin/tini
-RUN echo \
-      93dcc18adc78c65a028a84799ecf8ad40c936fdfc5f2a57b1acda5a8117fa82c\ ./usr/bin/tini \
-      | sha256sum --check \
-    && \
-    chmod +x ./usr/bin/tini
 COPY entrypoint ./opt/container/
-
 
 FROM scratch
 COPY --from=rootfs_builder /rootfs /
 ENV LANG=C.UTF-8
-ENTRYPOINT [ "/usr/bin/tini", "--", "/opt/container/entrypoint" ]
+ENTRYPOINT [ "/opt/container/entrypoint" ]
 CMD [ "bash" , "-l" ]
