@@ -10,6 +10,24 @@ prepare_remove_docs() {
 }
 
 
+add_rpath() {
+  local binary="${1}"
+  shift
+  local new_rpath="${1}"
+  shift
+  local rpath
+  rpath="$(
+    patchelf \
+      --print-rpath \
+      "${binary}"
+  )"
+  patchelf \
+    --set-rpath \
+    "${rpath:+${rpath}:}${new_rpath}" \
+    "${binary}"
+}
+
+
 prepare() {
   local pkg="${1}"
   shift
@@ -46,6 +64,29 @@ prepare() {
       ;;
     bash )
       rm -rf ./usr/share/locale
+      # Add custom rpath for libtinfo (see below) to bash binaries.
+      local new_rpath='/lib/x86_64-linux-gnu/terminfo:/usr/lib/x86_64-linux-gnu/terminfo'
+      add_rpath ./bin/bash "${new_rpath}"
+      add_rpath ./usr/bin/clear_console "${new_rpath}"
+      ;;
+    libtinfo5 | \
+    libtinfo6 )
+      # Move libtinfo libraries to a custom path to ensure it is not
+      # unintentionally used in downstream images.
+      find ./usr/lib/x86_64-linux-gnu -type f \
+        | {
+          while read binary ; do
+            add_rpath "${binary}" '/lib/x86_64-linux-gnu/terminfo'
+          done
+        }
+
+      mv ./lib/x86_64-linux-gnu ./temp
+      mkdir ./lib/x86_64-linux-gnu
+      mv ./temp ./lib/x86_64-linux-gnu/terminfo
+
+      mv ./usr/lib/x86_64-linux-gnu ./temp
+      mkdir ./usr/lib/x86_64-linux-gnu
+      mv ./temp ./usr/lib/x86_64-linux-gnu/terminfo
       ;;
     libc-bin | \
     libgcc1 | \
@@ -55,8 +96,6 @@ prepare() {
     gcc-10-base | \
     libcrypt1 | \
     libgcc-s1 | \
-    libtinfo5 | \
-    libtinfo6 | \
     ncurses-base | \
     zlib1g )
       :
