@@ -24,12 +24,6 @@ jobs:
       # similar to the larger base image (which does not use Debian 10+ because
       # of increased size due to additional dependencies pulled in for OpenGL).
       DEBIAN_VERSION: '9.13'
-      TEST_COMMAND: |
-        bash -c '\
-          wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && \
-          sh ./Miniconda3-latest-Linux-x86_64.sh -bp /opt/conda && \
-          /opt/conda/bin/conda info --all'
-
 
     steps:
     - uses: actions/checkout@v2
@@ -86,11 +80,14 @@ jobs:
 
     - name: Test Built Image
       run: |
+        image='${{ steps.buildah-build.outputs.image }}'
         for tag in ${{ steps.buildah-build.outputs.tags }} ; do
-          podman run --rm \
-            "${{ steps.buildah-build.outputs.image }}:${tag}" \
-            ${{ env.TEST_COMMAND }}
+          buildah bud \
+            --build-arg=base="${image}:${tag}" \
+            --file=Dockerfile.test \
+            "images/${image}"
         done
+        buildah rmi --prune || true
 
     - name: Check For Already Uploaded Tags
       run: |
@@ -127,6 +124,8 @@ jobs:
       run: |
         image='${{ secrets.QUAY_BIOCONDA_REPO }}/${{ steps.buildah-build.outputs.image }}'
         for tag in ${{ steps.buildah-build.outputs.tags }} ; do
-          podman run --rm "${image}:${tag}" \
-            ${{ env.TEST_COMMAND }}
+          buildah bud \
+            --build-arg=base="${image}:${tag}" \
+            --file=Dockerfile.test \
+            "images/${image}"
         done

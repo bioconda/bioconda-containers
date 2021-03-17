@@ -44,7 +44,7 @@ RUN mkdir -p \
 RUN rm -rf ./lib ./lib64
 
 COPY install-pkgs /usr/local/bin
-RUN install-pkgs "$( pwd )" /tmp/work bash ncurses-base libc-bin zlib1g
+RUN install-pkgs "$( pwd )" /tmp/work bash ncurses-base libc-bin
 
 ARG tini_version=0.19.0
 ADD "https://github.com/krallin/tini/releases/download/v${tini_version}/tini-amd64" ./usr/bin/tini
