@@ -118,12 +118,10 @@ jobs:
           }
         for tag in ${{ steps.buildah-build.outputs.tags }} ; do
           if [ \! "${tag}" = latest ] ; then
-            printf %s "${existing_tags}" \
-              | grep -qxF "${tag}" \
-            && {
+            if printf %s "${existing_tags}" | grep -qxF "${tag}" ; then
               printf 'Tag %s already exists!\n' "${tag}"
               exit 1
-            }
+            fi
           fi
         done
 
@@ -153,3 +151,4 @@ jobs:
             --file=Dockerfile.test \
             "images/${image}"
         done
+        buildah rmi --prune || true
