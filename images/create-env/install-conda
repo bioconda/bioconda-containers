@@ -1,0 +1,99 @@
+#! /bin/sh -eu
+
+version="${1}"
+conda_install_prefix="${2}"
+
+# Run the following in a subshell to avoid environment changes from bootstrap.
+(
+  # Install a bootstrap Miniconda installation.
+  miniconda_boostrap_prefix="$( pwd )/miniconda"
+  sh ./miniconda.sh \
+    -b \
+    -p "${miniconda_boostrap_prefix}"
+
+  # Install the base Conda installation.
+  . "${miniconda_boostrap_prefix}/etc/profile.d/conda.sh"
+
+  # Install conda and some additional tools:
+  #  - tini: init program,
+  #  - binutils, findutils: tools to strip down image/environment size,
+  #  - mamba: alternative Conda package manager.
+
+  # Only need `strip` executable from binutils. Other binaries from the package
+  # and especially the "sysroot" dependency is only bloat for this container
+  # image. (NOTE: The binary needs libgcc-ng which is explicitly added later.)
+  conda create --yes \
+    --prefix="${conda_install_prefix}" \
+    --channel=conda-forge \
+    binutils
+  tmp_dir="${miniconda_boostrap_prefix}/tmp-strip"
+  mkdir "${tmp_dir}"
+  mv "${conda_install_prefix}/bin/"*strip "${tmp_dir}/"
+  conda remove --yes --all \
+    --prefix="${conda_install_prefix}"
+
+  conda create --yes \
+    --prefix="${conda_install_prefix}" \
+    --channel=conda-forge \
+    \
+    conda="${version}" \
+    \
+    tini \
+    \
+    libgcc-ng \
+    findutils \
+    \
+    mamba \
+    ;
+
+  mv \
+    ./print-env-activate \
+    ./create-env \
+    "${tmp_dir}/"* \
+    "${conda_install_prefix}/bin/"
+  rmdir "${tmp_dir}"
+
+  # Remove bootstrap Miniconda files.
+  rm -rf "${miniconda_boostrap_prefix}"
+)
+
+# Activate the new base environment.
+activate_script="$(
+  "${conda_install_prefix}/bin/conda" shell.posix activate base
+)"
+set +u
+eval "${activate_script}"
+set -u
+unset activate_script
+
+
+# Use --conda=: to turn the `conda create` into a no-op, but do continue to
+# run strip, remove files and output the activate/execute scripts.
+create-env \
+  --conda=: \
+  --strip \
+  --remove-files=\*.a \
+  --remove-files=\*.pyc \
+  --env-activate-args=--prefix-is-base \
+  "${conda_install_prefix}"
+
+# Add standard Bioconda config to root's Conda config.
+conda config \
+  --append channels conda-forge \
+  --append channels bioconda \
+  --append channels defaults \
+  ;
+conda config \
+  --remove repodata_fns current_repodata.json \
+  2> /dev/null \
+  || true
+conda config \
+  --prepend repodata_fns repodata.json
+
+
+# Log information of the newly created Conda installation.
+# NB: Running conda after the .pyc removal will recreate some .pyc files.
+#     This is intentional as it speeds up conda startup time.
+conda list --name=base
+conda info --all
+mamba --version

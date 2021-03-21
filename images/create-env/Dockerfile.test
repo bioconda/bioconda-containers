@@ -1,0 +1,48 @@
+ARG base
+
+
+FROM "${base}" as build_bioconda_utils
+RUN /opt/create-env/env-execute \
+      create-env \
+        --conda=mamba \
+        --strip \
+        /usr/local \
+        bioconda-utils
+FROM bioconda/base-glibc-busybox-bash
+COPY --from=build_bioconda_utils /usr/local /usr/local
+RUN /usr/local/env-execute \
+      bioconda-utils --version \
+    && \
+    [ ! "${CONDA_PREFIX}" = /usr/local ] \
+    && \
+    { set -x && . /usr/local/env-activate.sh && set +x ; } \
+    && \
+    [ "${CONDA_PREFIX}" = /usr/local ] \
+    && \
+    bioconda-utils --version
+
+
+FROM "${base}" as build_conda
+RUN /usr/local/env-execute \
+      create-env \
+        --conda=mamba \
+        --env-activate-args='--prefix-is-base' \
+        --strip \
+        --remove-files=\*.a \
+        --remove-files=\*.pyc \
+        /opt/conda \
+        conda
+FROM bioconda/base-glibc-busybox-bash
+COPY --from=build_conda /opt/conda /opt/conda
+COPY --from=build_conda /opt/conda/env-activate.sh /usr/local/
+RUN /usr/local/env-execute \
+      conda info --all \
+    && \
+    { set -x && . /usr/local/env-activate.sh && set +x ; } \
+    && \
+    . "${CONDA_PREFIX}/etc/profile.d/conda.sh" \
+    && \
+    conda activate \
+    && \
+    conda info \
+      | grep 'base environment.*/opt/conda'

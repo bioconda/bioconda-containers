@@ -1,0 +1,118 @@
+#! /bin/sh -eu
+
+for arg do
+  case "${arg}" in
+    --help )
+      cat <<'end-of-help'
+Usage: create-env [OPTIONS]... [--] PREFIX [CONDA_CREATE_ARGS]...
+Use conda (or mamba via --conda=mamba) to create a Conda environment at PREFIX
+according to specifications given by CONDA_CREATE_ARGS.
+
+  --conda=CONDA               text
+  --env-activate-args=ARGS    text
+  --env-activate-script=FILE  text
+  --env-execute-script=FILE   text
+  --remove-files=GLOB         text
+  --strip[=yes|=no]           text
+end-of-help
+      exit 0 ;;
+    --conda=* )
+      conda_impl="${arg#--conda=}"
+      shift ;;
+    --env-activate-args=* )
+      env_activate_args="${arg#--env-activate-args=}"
+      shift ;;
+    --env-activate-script=* )
+      env_activate_file="${arg#--env-activate-script=}"
+      shift ;;
+    --env-execute-script=* )
+      env_execute_file="${arg#--env-execute-script=}"
+      shift ;;
+    --remove-files=* )
+      remove_files_globs="$(
+        printf '%s\n' \
+          ${remove_files_globs+"${remove_files_globs}"} \
+          "${arg#--remove-files=}"
+      )"
+      shift ;;
+    --strip=yes | --strip )
+      strip=1 ; shift ;;
+    --strip=no )
+      strip=0 ; shift ;;
+    -- )
+      break ;;
+    -* )
+      printf 'unknown option: %s\n' "${arg}"
+      exit 1 ;;
+    * )
+      break
+  esac
+done
+
+if [ $# -eq 0 ] ; then
+  printf 'missing argument: environment path\n'
+  exit 1
+fi
+
+prefix="${1%%/}"
+shift
+
+conda_impl="${conda_impl:-conda}"
+env_activate_args="--prefix='${prefix}' ${env_activate_args-}"
+env_activate_file="${env_activate_file-"${prefix}/env-activate.sh"}"
+env_execute_file="${env_execute_file-"${prefix}/env-execute"}"
+remove_files_globs="$( printf '%s\n' "${remove_files_globs-}" | sort -u )"
+strip="${strip-0}"
+
+
+set +u
+eval "$( conda shell.posix activate base )"
+set -u
+
+# Use --copy to cut links to package cache.
+# (Which is esp. important if --strip or --remove-files are used!)
+${conda_impl} create --yes --copy --prefix="${prefix}" "${@}"
+
+if [ -n "${env_activate_file-}${env_execute_file-}" ] ; then
+  activate_script="$(
+    eval "set -- ${env_activate_args}"
+    print-env-activate "${@}"
+  )"
+  if [ -n "${env_activate_file-}" ] ; then
+    printf '%s\n' \
+      "${activate_script}" \
+      > "${env_activate_file}"
+    activate_script=". '${env_activate_file}'"
+  fi
+  if [ -n "${env_execute_file-}" ] ; then
+    printf '%s\n' \
+      '#! /bin/sh' \
+      "${activate_script}" \
+      'exec "${@}"' \
+      > "${env_execute_file}"
+    chmod +x "${env_execute_file}"
+  fi
+fi
+
+if [ -n "${remove_files_globs}" ] ; then
+  (
+    eval "set -- $(
+      printf %s "${remove_files_globs}" \
+        | sed -e "s|.*|-path '${prefix}/&'|" -e '1!s/^/-o /' \
+        | tr '\n' ' '
+    )"
+    find "${prefix}" \
+      -type f \
+      \( "${@}" \) \
+      -delete
+  )
+fi
+
+if [ "${strip}" = 1 ] ; then
+  # Strip binaries. (Run strip on all files; ignore errors for non-ELF files.)
+  find "${prefix}" \
+    -type f \
+    -exec strip {} \+ \
+    2> /dev/null \
+    || true
+fi
