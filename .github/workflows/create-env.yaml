@@ -1,82 +1,40 @@
-name: Build and Push Image "base-glibc-busybox-bash"
+name: Build and Push Image "create-env"
 on:
   push:
     branch: main
     paths:
-    - images/base-glibc-busybox-bash/*
-    - .github/workflows/base-glibc-busybox-bash.yaml
+    - images/create-env/*
+    - .github/workflows/create-env.yaml
   pull_request:
     paths:
-    - images/base-glibc-busybox-bash/*
-    - .github/workflows/base-glibc-busybox-bash.yaml
+    - images/create-env/*
+    - .github/workflows/create-env.yaml
 
 jobs:
   build:
     name: Build and Push Image
     runs-on: ubuntu-20.04
     env:
-      # The base image is not intended to change often and should be used with
-      # version tags or checksum IDs, but not via "latest".
-      IMAGE_VERSION: '1.1.0'
-      IMAGE_NAME: base-glibc-busybox-bash
-      BUSYBOX_VERSION: '1.32.1'
-      # Use Debian 9 instead of newer one for now to get an image which is more
-      # similar to the larger base image (which does not use Debian 10+ because
-      # of increased size due to additional dependencies pulled in for OpenGL).
-      DEBIAN_VERSION: '9.13'
+      IMAGE_VERSION: '1.0.0'
+      VERSION: '4.9.2'
+      IMAGE_NAME: create-env
 
     steps:
     - uses: actions/checkout@v2
 
     - name: Build Image
       id: buildah-build
-      run: |
-        set -xeu
-        cd 'images/${{ env.IMAGE_NAME }}'
-
-        iidfile="$( mktemp )"
-        buildah bud --layers \
-          --iidfile="${iidfile}" \
-          --build-arg=busybox_version="${{ env.BUSYBOX_VERSION }}" \
-          --build-arg=debian_version="${{ env.DEBIAN_VERSION }}"
-        image_id="$( cat "${iidfile}" )"
-        rm "${iidfile}"
-
-        container="$( buildah from "${image_id}" )"
-        run() { buildah run "${container}" "${@}" ; }
-        deb_list="$( run cat /.deb.lst )"
-        pkg_list="$( run cat /.pkg.lst )"
-        glibc="$( run sh -c 'exec "$( find /lib -name libc.so.6 -print -quit )"' | sed '1!d' )"
-        busybox="$( run busybox | sed '1!d' )"
-        bash="$( run bash --version | sed '1!d' )"
-        buildah rm "${container}"
-
-        container="$( buildah from "${image_id}" )"
-        buildah config --label=glibc="${glibc}" "${container}"
-        buildah config --label=busybox="${busybox}" "${container}"
-        buildah config --label=deb-list="${deb_list}" "${container}"
-        buildah config --label=pkg-list="${pkg_list}" "${container}"
-
-        glibc_version="$( printf %s "${glibc}" | sed -E 's/.*version ([0-9.]*[0-9]).*/\1/' )"
-        busybox_version="$( printf %s "${busybox}" | sed -E '1 s/.*v([0-9.]*[0-9]).*/\1/' )"
-        bash_version="$( printf %s "${bash}" | sed -E 's/.*version ([0-9.]*[0-9]).*/\1/' )"
-        tags="
-          ${{ env.IMAGE_VERSION }}
-          ${{ env.IMAGE_VERSION }}_${glibc_version}_${busybox_version}_${bash_version}
+      uses: redhat-actions/buildah-build@v2
+      with:
+        image: ${{ env.IMAGE_NAME }}
+        tags: >-
           latest
-        "
-
-        image_id="$( buildah commit "${container}" )"
-        buildah rm "${container}"
-        image_name='${{ env.IMAGE_NAME }}'
-
-        for tag in ${tags} ; do
-          buildah tag "${image_id}" \
-            "${image_name}":"${tag}"
-        done
-
-        echo "::set-output name=image::${image_name}"
-        echo "::set-output name=tags::$( echo ${tags} )"
+          ${{ env.IMAGE_VERSION }}-${{ env.VERSION }}
+        context: ./images/${{ env.IMAGE_NAME }}
+        dockerfiles: |
+          ./images/${{ env.IMAGE_NAME }}/Dockerfile
+        build-args: |
+          version=${{ env.VERSION }}
 
     - name: Test Built Image
       run: |
