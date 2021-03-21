@@ -52,7 +52,7 @@ jobs:
         buildah config --label=debian="${debian}" "${container}"
 
         glibc_version="$( printf %s "${glibc}" | sed -E 's/.*version ([0-9.]*[0-9]).*/\1/' )"
-        debian_version="$( printf %s "${debian}" | sed -E '1 s/.*v([0-9.]*[0-9]).*/\1/' )"
+        debian_version="$( printf %s "${debian}" | sed -E 's|/|_|g' )"
         bash_version="$( printf %s "${bash}" | sed -E 's/.*version ([0-9.]*[0-9]).*/\1/' )"
         tags="
           ${{ env.IMAGE_VERSION }}
