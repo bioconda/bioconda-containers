@@ -31,8 +31,8 @@ COPY --from=target_base / ./
 RUN find . -samefile ./bin/busybox -delete
 COPY --from=busybox_builder /busybox/busybox ./
 RUN mkdir -p \
-      ./bin ./usr/bin ./usr/local/bin \
-      ./sbin ./usr/sbin ./usr/local/sbin \
+      ./bin ./usr/bin \
+      ./sbin ./usr/sbin \
     && \
     chroot . /busybox --install \
     && \
@@ -50,7 +50,15 @@ RUN apt-get update -qq \
       patchelf
 
 COPY install-pkgs /usr/local/bin
-RUN install-pkgs "$( pwd )" /tmp/work bash ncurses-base libc-bin
+RUN install-pkgs "$( pwd )" /tmp/work \
+      bash \
+      ncurses-base \
+      libc-bin \
+    && \
+    # Remove contents of /usr/local as downstream images overwrite those.
+    find ./usr/local/ \
+      -mindepth 1 -depth \
+      -delete
 
 FROM scratch
 COPY --from=rootfs_builder /rootfs /

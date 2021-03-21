@@ -27,7 +27,12 @@ RUN apt-get update -qq \
       locales \
     && \
     # Remove apt package lists.
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* \
+    && \
+    # Remove contents of /usr/local as downstream images overwrite those.
+    find ./usr/local/ \
+      -mindepth 1 -depth \
+      -delete
 
 ENV LANG=C.UTF-8
 CMD [ "bash" , "-l" ]
