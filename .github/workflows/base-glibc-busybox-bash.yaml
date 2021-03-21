@@ -17,7 +17,7 @@ jobs:
     env:
       # The base image is not intended to change often and should be used with
       # version tags or checksum IDs, but not via "latest".
-      IMAGE_VERSION: '1.0.1'
+      IMAGE_VERSION: '1.1.0'
       IMAGE_NAME: base-glibc-busybox-bash
       BUSYBOX_VERSION: '1.32.1'
       # Use Debian 9 instead of newer one for now to get an image which is more
