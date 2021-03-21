@@ -34,5 +34,27 @@ RUN apt-get update -qq \
       -mindepth 1 -depth \
       -delete
 
+# env-activate.sh (+ optionally env-execute) should be overwritten downstream.
+# - env-activate.sh:
+#    Is sourced (via symlink in /etc/profile.d/) to activate the /usr/local env.
+# - env-execute:
+#    Is set as the ENTRYPOINT to activate /usr/local before exec'ing CMD.
+RUN touch /usr/local/env-activate.sh \
+    && \
+    touch /usr/local/env-execute \
+    && \
+    chmod +x /usr/local/env-execute \
+    && \
+    ln -s \
+      /usr/local/env-activate.sh \
+      /etc/profile.d/env-activate.sh \
+    && \
+    printf '%s\n' \
+      '#! /bin/sh' \
+      ". '/usr/local/env-activate.sh'" \
+      'exec "${@}"' \
+      > /usr/local/env-execute
+
 ENV LANG=C.UTF-8
-CMD [ "bash" , "-l" ]
+ENTRYPOINT [ "/usr/local/env-execute" ]
+CMD [ "bash" ]
