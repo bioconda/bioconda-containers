@@ -27,7 +27,47 @@ RUN apt-get update -qq \
       locales \
     && \
     # Remove apt package lists.
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* \
+    && \
+    # Remove contents of /usr/local as downstream images overwrite those.
+    find ./usr/local/ \
+      -mindepth 1 -depth \
+      -delete
+
+# Bash 4.* did not have default key bindings for control-arrow-key key
+# combinations. Add some for convenience:
+RUN >> /etc/inputrc \
+      printf '%s\n' \
+      '' \
+      '"\e[5C": forward-word' \
+      '"\e[5D": backward-word' \
+      '"\e\e[C": forward-word' \
+      '"\e\e[D": backward-word' \
+      '"\e[1;5C": forward-word' \
+      '"\e[1;5D": backward-word' \
+      ;
+
+# env-activate.sh (+ optionally env-execute) should be overwritten downstream.
+# - env-activate.sh:
+#    Is sourced (via symlink in /etc/profile.d/) to activate the /usr/local env.
+# - env-execute:
+#    Is set as the ENTRYPOINT to activate /usr/local before exec'ing CMD.
+RUN touch /usr/local/env-activate.sh \
+    && \
+    touch /usr/local/env-execute \
+    && \
+    chmod +x /usr/local/env-execute \
+    && \
+    ln -s \
+      /usr/local/env-activate.sh \
+      /etc/profile.d/env-activate.sh \
+    && \
+    printf '%s\n' \
+      '#! /bin/sh' \
+      ". '/usr/local/env-activate.sh'" \
+      'exec "${@}"' \
+      > /usr/local/env-execute
 
 ENV LANG=C.UTF-8
-CMD [ "bash" , "-l" ]
+ENTRYPOINT [ "/usr/local/env-execute" ]
+CMD [ "bash" ]

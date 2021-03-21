@@ -31,8 +31,8 @@ COPY --from=target_base / ./
 RUN find . -samefile ./bin/busybox -delete
 COPY --from=busybox_builder /busybox/busybox ./
 RUN mkdir -p \
-      ./bin ./usr/bin ./usr/local/bin \
-      ./sbin ./usr/sbin ./usr/local/sbin \
+      ./bin ./usr/bin \
+      ./sbin ./usr/sbin \
     && \
     chroot . /busybox --install \
     && \
@@ -50,9 +50,39 @@ RUN apt-get update -qq \
       patchelf
 
 COPY install-pkgs /usr/local/bin
-RUN install-pkgs "$( pwd )" /tmp/work bash ncurses-base libc-bin
+RUN install-pkgs "$( pwd )" /tmp/work \
+      bash \
+      ncurses-base \
+      libc-bin \
+    && \
+    # Remove contents of /usr/local as downstream images overwrite those.
+    find ./usr/local/ \
+      -mindepth 1 -depth \
+      -delete
+
+# env-activate.sh (+ optionally env-execute) should be overwritten downstream.
+# - env-activate.sh:
+#    Is sourced (via symlink in /etc/profile.d/) to activate the /usr/local env.
+# - env-execute:
+#    Is set as the ENTRYPOINT to activate /usr/local before exec'ing CMD.
+RUN touch ./usr/local/env-activate.sh \
+    && \
+    touch ./usr/local/env-execute \
+    && \
+    chmod +x ./usr/local/env-execute \
+    && \
+    ln -s \
+      /usr/local/env-activate.sh \
+      ./etc/profile.d/env-activate.sh \
+    && \
+    printf '%s\n' \
+      '#! /bin/sh' \
+      ". '/usr/local/env-activate.sh'" \
+      'exec "${@}"' \
+      > ./usr/local/env-execute
 
 FROM scratch
 COPY --from=rootfs_builder /rootfs /
 ENV LANG=C.UTF-8
-CMD [ "bash" , "-l" ]
+ENTRYPOINT [ "/usr/local/env-execute" ]
+CMD [ "bash" ]
