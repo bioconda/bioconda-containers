@@ -34,6 +34,19 @@ RUN apt-get update -qq \
       -mindepth 1 -depth \
       -delete
 
+# Bash 4.* did not have default key bindings for control-arrow-key key
+# combinations. Add some for convenience:
+RUN >> /etc/inputrc \
+      printf '%s\n' \
+      '' \
+      '"\e[5C": forward-word' \
+      '"\e[5D": backward-word' \
+      '"\e\e[C": forward-word' \
+      '"\e\e[D": backward-word' \
+      '"\e[1;5C": forward-word' \
+      '"\e[1;5D": backward-word' \
+      ;
+
 # env-activate.sh (+ optionally env-execute) should be overwritten downstream.
 # - env-activate.sh:
 #    Is sourced (via symlink in /etc/profile.d/) to activate the /usr/local env.
