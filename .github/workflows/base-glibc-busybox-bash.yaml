@@ -85,6 +85,7 @@ jobs:
           )"
         ids="$( printf %s "${ids}" | sort -u )"
         for id in ${ids} ; do
+          podman history "${id}"
           buildah bud \
             --build-arg=base="${id}" \
             --file=Dockerfile.test \
@@ -143,6 +144,7 @@ jobs:
           )"
         ids="$( printf %s "${ids}" | sort -u )"
         for id in ${ids} ; do
+          podman history "${id}"
           buildah bud \
             --build-arg=base="${id}" \
             --file=Dockerfile.test \
