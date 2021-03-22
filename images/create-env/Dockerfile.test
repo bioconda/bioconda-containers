@@ -23,7 +23,7 @@ RUN /usr/local/env-execute \
 
 
 FROM "${base}" as build_conda
-RUN /usr/local/env-execute \
+RUN /opt/create-env/env-execute \
       create-env \
         --conda=mamba \
         --env-activate-args='--prefix-is-base' \

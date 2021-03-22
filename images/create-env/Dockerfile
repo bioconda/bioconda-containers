@@ -1,5 +1,5 @@
 # Use Debian instead of BusyBox base since Miniconda currently needs external zlib.
-FROM bioconda/base-glibc-debian-bash as build
+FROM quay.io/bioconda/base-glibc-debian-bash as build
 
 WORKDIR /tmp/work
 COPY install-conda print-env-activate create-env ./
@@ -9,14 +9,13 @@ ARG version='4.9.2'
 RUN ./install-conda "${version}" /opt/create-env
 
 
-FROM bioconda/base-glibc-busybox-bash
+FROM quay.io/bioconda/base-glibc-busybox-bash
 
 COPY --from=build /opt/create-env /opt/create-env
 # Copy (Bioconda-specific) Conda configuration created by the install-conda script.
 COPY --from=build /root/.condarc /root/
 
-RUN cp /opt/create-env/env-activate.sh /usr/local/ \
-    && \
+RUN \
     # Use a per-user config (instead of conda config --sys) for more flexibility.
     cp /root/.condarc /etc/skel/ \
     && \
@@ -30,5 +29,5 @@ RUN cp /opt/create-env/env-activate.sh /usr/local/ \
       >>   /etc/skel/.bashrc
 ENV ENV=/etc/profile.d/conda.sh
 
-ENTRYPOINT [ "/opt/create-env/bin/tini", "--", "/usr/local/env-execute" ]
+ENTRYPOINT [ "/opt/create-env/bin/tini", "--", "/opt/create-env/env-execute" ]
 CMD [ "bash" ]
