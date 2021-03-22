@@ -1,4 +1,4 @@
-ARG debian_version=10.8
+ARG debian_version=bullseye
 
 FROM "debian:${debian_version}-slim"
 

@@ -1,5 +1,5 @@
 ARG busybox_version=1.32.1
-ARG debian_version=10.8
+ARG debian_version=bullseye
 
 # Don't use Debian's busybox package since it only provides a smaller subset of
 # BusyBox's functions (e.g., no administrative tools like adduser etc.).
