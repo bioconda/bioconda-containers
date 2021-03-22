@@ -1,4 +1,4 @@
-ARG debian_version=9.13
+ARG debian_version=10.8
 
 FROM "debian:${debian_version}-slim"
 
@@ -25,6 +25,15 @@ RUN apt-get update -qq \
     && \
     apt-get remove --yes \
       locales \
+    && \
+    # On Debian 10 (and 11) libgl1-mesa-glx pulls in libgl1-mesa-dri (which in
+    # turn has more heavy-weight dependencies). We leave these out of the image
+    # (by manually removing it from "Depends:" list) like we do with Debian 9.
+    sed -i \
+      '/^Depends:/ s/, libgl1-mesa-dri\>//g' \
+      /var/lib/dpkg/status \
+    && \
+    apt-get autoremove --yes \
     && \
     # Remove apt package lists.
     rm -rf /var/lib/apt/lists/* \
