@@ -29,6 +29,7 @@ jobs:
         image: ${{ env.IMAGE_NAME }}
         tags: >-
           latest
+          ${{ env.IMAGE_VERSION }}
           ${{ env.IMAGE_VERSION }}-${{ env.VERSION }}
         context: ./images/${{ env.IMAGE_NAME }}
         dockerfiles: |
