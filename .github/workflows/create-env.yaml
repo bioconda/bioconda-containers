@@ -15,7 +15,7 @@ jobs:
     name: Build and Push Image
     runs-on: ubuntu-20.04
     env:
-      IMAGE_VERSION: '1.0.1'
+      IMAGE_VERSION: '1.0.2'
       VERSION: '4.9.2'
       IMAGE_NAME: create-env
 
@@ -47,6 +47,7 @@ jobs:
           )"
         ids="$( printf %s "${ids}" | sort -u )"
         for id in ${ids} ; do
+          podman history "${id}"
           buildah bud \
             --build-arg=base="${id}" \
             --file=Dockerfile.test \
@@ -105,6 +106,7 @@ jobs:
           )"
         ids="$( printf %s "${ids}" | sort -u )"
         for id in ${ids} ; do
+          podman history "${id}"
           buildah bud \
             --build-arg=base="${id}" \
             --file=Dockerfile.test \
