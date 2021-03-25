@@ -17,6 +17,8 @@ RUN /opt/create-env/env-execute \
         pyyaml \
         skopeo \
     && \
+    # Workaround for https://github.com/conda/conda/issues/10490
+    export CONDA_REPODATA_THREADS=1 && \
     # We don't need Perl (used by Git for some functionalities).
     # => Remove perl package to reduce image size.
     /opt/create-env/env-execute \
