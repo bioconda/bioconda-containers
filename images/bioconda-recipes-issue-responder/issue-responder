@@ -448,7 +448,8 @@ async def upload_artifacts(session: ClientSession, pr: int) -> str:
     assert artifacts
 
     # Download/upload Artifacts
-    await gather(*(download_and_upload(session, artifact) for artifact in artifacts))
+    for artifact in artifacts:
+        await download_and_upload(session, artifact)
 
     return sha
 
