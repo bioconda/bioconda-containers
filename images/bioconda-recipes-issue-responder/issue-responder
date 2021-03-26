@@ -505,7 +505,7 @@ async def merge_pr(session: ClientSession, pr: int) -> None:
                 "merge_method": "squash",
             }
             log("Putting merge commit")
-            async with session.post(url, headers=headers, json=payload) as response:
+            async with session.put(url, headers=headers, json=payload) as response:
                 rc = response.status
             log("body %s", payload)
             log("merge_pr the response code was %s", rc)
