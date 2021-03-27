@@ -62,9 +62,7 @@ prefix="${1%%/}"
 shift
 
 conda_impl="${conda_impl:-conda}"
-# Use --copy to cut links to package cache.
-# (Which is esp. important if --strip or --remove-files are used!)
-create_command="${create_command-create --copy}"
+create_command="${create_command-create}"
 env_activate_args="--prefix='${prefix}' ${env_activate_args-}"
 env_activate_file="${env_activate_file-"${prefix}/env-activate.sh"}"
 env_execute_file="${env_execute_file-"${prefix}/env-execute"}"
@@ -76,7 +74,14 @@ set +u
 eval "$( conda shell.posix activate base )"
 set -u
 
-CONDA_YES=1 ${conda_impl} ${create_command} --prefix="${prefix}" "${@}"
+# Use CONDA_ALWAYS_COPY=1 to cut links to package cache.
+# (Which is esp. important if --strip or --remove-files are used!)
+CONDA_YES=1 \
+  CONDA_ALWAYS_COPY="${CONDA_ALWAYS_COPY:-1}" \
+  ${conda_impl} \
+  ${create_command} \
+  --prefix="${prefix}" \
+  "${@}"
 
 if [ -n "${env_activate_file-}${env_execute_file-}" ] ; then
   activate_script="$(
