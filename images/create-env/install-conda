@@ -15,6 +15,9 @@ conda_install_prefix="${2}"
   . "${miniconda_boostrap_prefix}/etc/profile.d/conda.sh"
 
   # Install conda and some additional tools:
+  #  - python: pinned to 3.8 to avoid hitting
+  #    - https://github.com/conda/conda/issues/10490
+  #    - https://bugs.python.org/issue43517
   #  - tini: init program,
   #  - binutils, findutils: tools to strip down image/environment size,
   #  - mamba: alternative Conda package manager.
@@ -37,6 +40,8 @@ conda_install_prefix="${2}"
     --channel=conda-forge \
     \
     conda="${version}" \
+    \
+    python=3.8 \
     \
     tini \
     \
