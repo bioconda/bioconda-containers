@@ -8,13 +8,27 @@ Usage: create-env [OPTIONS]... [--] PREFIX [CONDA_CREATE_ARGS]...
 Use conda (or mamba via --conda=mamba) to create a Conda environment at PREFIX
 according to specifications given by CONDA_CREATE_ARGS.
 
-  --conda=CONDA               text
-  --create-command=CREATE     text
-  --env-activate-args=ARGS    text
-  --env-activate-script=FILE  text
-  --env-execute-script=FILE   text
-  --remove-files=GLOB         text
-  --strip[=yes|=no]           text
+  --conda=CONDA               Conda implementation to run CONDA CREATE for.
+                              E.g.: "conda", "mamba", "conda env", "mamba env".
+                              Use ":" to skip env creation. (default: conda)
+  --create-command=CREATE     Conda command to run. E.g.: "create", "install".
+                              (default: create)
+  --env-activate-args=ARGS    Single string of arguments to pass on to
+                              print-env-activate. (default: --prefix=PREFIX)
+  --env-activate-script=FILE  Destination path of environment activation
+                              script. (default: PREFIX/env-activate.sh)
+  --env-execute-script=FILE   Destination path of environment execution script.
+                              (default: PREFIX/env-execute)
+  --remove-files=GLOB         Glob of files to remove from PREFIX after its
+                              creation. Can be passed on multiple times.
+                              Will be passed on to `find ... -path GLOB`.
+                              (no default)
+  --strip[=yes|=no]           Option to run `strip` on all files in PREFIX.
+                              (default: no)
+  --licenses-path=PATH        Destination path to copy package license files
+                              to (relative to PREFIX or absolute). Pass on
+                              empty path (--licenses-path=) to skip copying.
+                              (default: conda-meta)
 end-of-help
       exit 0 ;;
     --conda=* )
