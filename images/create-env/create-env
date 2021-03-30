@@ -78,6 +78,7 @@ set +u
 eval "$( conda shell.posix activate base )"
 set -u
 
+printf 'creating environment at %s ...\n' "${prefix}" 1>&2
 # Use CONDA_ALWAYS_COPY=1 to cut links to package cache.
 # (Which is esp. important if --strip or --remove-files are used!)
 CONDA_YES=1 \
@@ -88,17 +89,20 @@ CONDA_YES=1 \
   "${@}"
 
 if [ -n "${env_activate_file}${env_execute_file}" ] ; then
+  printf 'generating activation script...\n' 1>&2
   activate_script="$(
     eval "set -- ${env_activate_args}"
     print-env-activate "${@}"
   )"
   if [ -n "${env_activate_file-}" ] ; then
+    printf 'writing activation script to %s ...\n' "${env_activate_file}" 1>&2
     printf '%s\n' \
       "${activate_script}" \
       > "${env_activate_file}"
     activate_script=". '${env_activate_file}'"
   fi
   if [ -n "${env_execute_file-}" ] ; then
+    printf 'writing execution script to %s ...\n' "${env_execute_file}" 1>&2
     printf '%s\n' \
       '#! /bin/sh' \
       "${activate_script}" \
@@ -109,6 +113,7 @@ if [ -n "${env_activate_file}${env_execute_file}" ] ; then
 fi
 
 if [ -n "${remove_files_globs}" ] ; then
+  printf 'removing files from %s ...\n' "${prefix}" 1>&2
   (
     eval "set -- $(
       printf %s "${remove_files_globs}" \
@@ -123,6 +128,7 @@ if [ -n "${remove_files_globs}" ] ; then
 fi
 
 if [ "${strip}" = 1 ] ; then
+  printf 'stripping binaries in %s ...\n' "${prefix}" 1>&2
   # Strip binaries. (Run strip on all files; ignore errors for non-ELF files.)
   find "${prefix}" \
     -type f \
@@ -139,6 +145,7 @@ if [ -n "${licenses_path}" ] ; then
     cd "${licenses_path}"
     pwd
   )"
+  printf 'copying license files to %s ...\n' "${abs_licenses_path}" 1>&2
   pkgs_dirs="$(
     conda config --show pkgs_dirs \
       | sed -n 's|[^/]*\(/.*\)|"\1"|p' \
@@ -178,3 +185,5 @@ if [ -n "${licenses_path}" ] ; then
     done
   )
 fi
+
+printf 'finished create-env for %s\n' "${prefix}" 1>&2
