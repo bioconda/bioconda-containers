@@ -3,10 +3,10 @@
 version="${1}"
 conda_install_prefix="${2}"
 
+# Install a bootstrap Miniconda installation.
+miniconda_boostrap_prefix="$( pwd )/miniconda"
 # Run the following in a subshell to avoid environment changes from bootstrap.
 (
-  # Install a bootstrap Miniconda installation.
-  miniconda_boostrap_prefix="$( pwd )/miniconda"
   sh ./miniconda.sh \
     -b \
     -p "${miniconda_boostrap_prefix}"
@@ -57,9 +57,6 @@ conda_install_prefix="${2}"
     "${tmp_dir}/"* \
     "${conda_install_prefix}/bin/"
   rmdir "${tmp_dir}"
-
-  # Remove bootstrap Miniconda files.
-  rm -rf "${miniconda_boostrap_prefix}"
 )
 
 # Activate the new base environment.
@@ -74,13 +71,17 @@ unset activate_script
 
 # Use --conda=: to turn the `conda create` into a no-op, but do continue to
 # run strip, remove files and output the activate/execute scripts.
-create-env \
-  --conda=: \
-  --strip \
-  --remove-files=\*.a \
-  --remove-files=\*.pyc \
-  --env-activate-args=--prefix-is-base \
-  "${conda_install_prefix}"
+CONDA_PKGS_DIRS="${miniconda_boostrap_prefix}/pkgs" \
+  create-env \
+    --conda=: \
+    --strip \
+    --remove-files=\*.a \
+    --remove-files=\*.pyc \
+    --env-activate-args=--prefix-is-base \
+    "${conda_install_prefix}"
+
+# Remove bootstrap Miniconda files.
+rm -rf "${miniconda_boostrap_prefix}"
 
 # Add standard Bioconda config to root's Conda config.
 conda config \

@@ -4,11 +4,14 @@ for arg do
   case "${arg}" in
     --help )
       cat <<'end-of-help'
-Usage: print-env-activate [OPTIONS]... [PREFIX]
+Usage: print-env-activate [OPTIONS]... [--] [PREFIX]
 Print shell activation script contents conda creates for environment at PREFIX.
 
-  --prefix=ENVIRONMENT        text
-  --prefix-is-base[=yes|=no]  text
+  --prefix=PREFIX             Optionally pass on PREFIX path as option-argument
+                              instead of operand.
+  --prefix-is-base[=yes|=no]  Specify if PREFIX is a base environment and use
+                              `PREFIX/bin/conda` to create a full base
+                              environment activation script. (default: no)
 end-of-help
       exit 0 ;;
     --prefix=* )
@@ -68,7 +71,7 @@ unset deactivate_script
 #     (Also, running this in the build instead of final container might not
 #     reflect the actual PS1 the target container image would provide.)
 PS1="$(
-  bash -ic 'printf %s "${PS1}"'
+  bash -ic 'printf %s "${PS1}"' 2>/dev/null
   printf .
 )"
 PS1="${PS1%.}"
