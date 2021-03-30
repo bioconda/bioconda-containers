@@ -43,6 +43,9 @@ end-of-help
       strip=1 ; shift ;;
     --strip=no )
       strip=0 ; shift ;;
+    --licenses-path=* )
+      licenses_path="${arg#--licenses-path=}"
+      shift ;;
     -- )
       break ;;
     -* )
@@ -68,6 +71,7 @@ env_activate_file="${env_activate_file-"${prefix}/env-activate.sh"}"
 env_execute_file="${env_execute_file-"${prefix}/env-execute"}"
 remove_files_globs="$( printf '%s\n' "${remove_files_globs-}" | sort -u )"
 strip="${strip-0}"
+licenses_path="${licenses_path-conda-meta}"
 
 
 set +u
@@ -83,7 +87,7 @@ CONDA_YES=1 \
   --prefix="${prefix}" \
   "${@}"
 
-if [ -n "${env_activate_file-}${env_execute_file-}" ] ; then
+if [ -n "${env_activate_file}${env_execute_file}" ] ; then
   activate_script="$(
     eval "set -- ${env_activate_args}"
     print-env-activate "${@}"
@@ -125,4 +129,52 @@ if [ "${strip}" = 1 ] ; then
     -exec strip {} \+ \
     2> /dev/null \
     || true
+fi
+
+
+if [ -n "${licenses_path}" ] ; then
+  abs_licenses_path="$(
+    cd "${prefix}"
+    mkdir -p "${licenses_path}"
+    cd "${licenses_path}"
+    pwd
+  )"
+  pkgs_dirs="$(
+    conda config --show pkgs_dirs \
+      | sed -n 's|[^/]*\(/.*\)|"\1"|p' \
+      | tr '\n' ' '
+  )"
+  (
+    eval "set -- $(
+      find "${prefix}/conda-meta" \
+        -maxdepth 1 \
+        -name \*.json \
+        | sed 's|.*/\(.*\)\.json|"\1"|' \
+        | tr '\n' ' '
+    )"
+    for pkg do
+      pkg_info="$(
+        eval "set -- ${pkgs_dirs}"
+        for pkgs_dir ; do
+          if [ -d "${pkgs_dir}/${pkg}/info" ] ; then
+            printf %s "${pkgs_dir}/${pkg}/info"
+            exit
+          fi
+        done
+        printf 'missing metadata for %s\n' "${pkg}" 1>&2
+        exit 1
+      )"
+      find "${pkg_info}" \
+        -maxdepth 1 \
+        \( -name LICENSE.txt -o -name licenses \) \
+        -exec sh -c '
+          mkdir -p "${2}"
+          cp -flR "${1}" "${2}"
+        ' -- {} "${abs_licenses_path}/${pkg}" \; \
+        || {
+          printf 'failed to copy licenses for %s\n' "${pkg}" 1>&2
+          exit 1
+        }
+    done
+  )
 fi
