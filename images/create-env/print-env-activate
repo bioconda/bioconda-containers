@@ -68,7 +68,7 @@ unset deactivate_script
 #     (Also, running this in the build instead of final container might not
 #     reflect the actual PS1 the target container image would provide.)
 PS1="$(
-  bash -ic 'printf %s "${PS1}"'
+  bash -ic 'printf %s "${PS1}"' 2>/dev/null
   printf .
 )"
 PS1="${PS1%.}"
