@@ -141,11 +141,11 @@ async def make_artifact_comment(session: ClientSession, pr: int, sha: str) -> No
             elif subdir == "linux-64":
                 comment += "linux-64 |"
                 install_linux = (
-                    "```\nconda install -c f{conda_install_url} <package name>\n```\n"
+                    f"```\nconda install -c {conda_install_url} <package name>\n```\n"
                 )
             else:
                 comment += "osx-64 |"
-                install_osx = "```\nconda install -c f{conda_install_url} <package name>\n```\n"
+                install_osx = f"```\nconda install -c {conda_install_url} <package name>\n```\n"
             comment += f" [{packageName}]({url}) | [repodata.json]({repo_url})\n"
 
         # Conda install examples
