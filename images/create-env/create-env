@@ -135,7 +135,6 @@ if [ -n "${remove_files_globs}" ] ; then
         | tr '\n' ' '
     )"
     find "${prefix}" \
-      -type f \
       \( "${@}" \) \
       -delete
   )
