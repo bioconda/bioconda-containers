@@ -135,13 +135,14 @@ if [ -n "${remove_files_globs}" ] ; then
         | tr '\n' ' '
     )"
     find "${prefix}" \
-      -type f \
       \( "${@}" \) \
       -delete
   )
 fi
 
 if [ "${strip}" = 1 ] ; then
+  # Ensure "strip" is available beforehand because errors are ignored later on.
+  strip --version > /dev/null
   printf 'stripping binaries in %s ...\n' "${prefix}" 1>&2
   # Strip binaries. (Run strip on all files; ignore errors for non-ELF files.)
   find "${prefix}" \
