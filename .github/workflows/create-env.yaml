@@ -1,7 +1,8 @@
 name: 'Build & Push: create-env'
 on:
   push:
-    branch: main
+    branches:
+    - main
     paths:
     - images/create-env/*
     - .github/workflows/create-env.yaml

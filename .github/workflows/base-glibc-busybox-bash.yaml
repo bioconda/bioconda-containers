@@ -1,7 +1,8 @@
 name: 'Build & Push: base-glibc-busybox-bash'
 on:
   push:
-    branch: main
+    branches:
+    - main
     paths:
     - images/base-glibc-busybox-bash/*
     - .github/workflows/base-glibc-busybox-bash.yaml
