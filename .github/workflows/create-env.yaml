@@ -1,4 +1,4 @@
-name: Build and Push Image "create-env"
+name: 'Build & Push: create-env'
 on:
   push:
     branch: main
@@ -12,7 +12,7 @@ on:
 
 jobs:
   build:
-    name: Build and Push Image
+    name: Build & Push
     runs-on: ubuntu-20.04
     env:
       IMAGE_VERSION: '1.2.0'
@@ -22,7 +22,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Build Image
+    - name: Build
       id: buildah-build
       uses: redhat-actions/buildah-build@v2
       with:
@@ -37,7 +37,7 @@ jobs:
         build-args: |
           version=${{ env.VERSION }}
 
-    - name: Test Built Image
+    - name: Test
       run: |
         image='${{ steps.buildah-build.outputs.image }}'
         ids="$(
@@ -55,7 +55,7 @@ jobs:
         done
         buildah rmi --prune || true
 
-    - name: Check For Already Uploaded Tags
+    - name: Check Tags
       run: |
         # FIX upstream: Quay.io does not support immutable images currently.
         #               => Try to use the REST API to check for duplicate tags.
@@ -86,7 +86,7 @@ jobs:
         done
 
     - if: ${{ github.ref == 'refs/heads/main' }}
-      name: Push To Quay
+      name: Push
       uses: redhat-actions/push-to-registry@v2
       with:
         image: ${{ steps.buildah-build.outputs.image }}
@@ -96,7 +96,7 @@ jobs:
         password: ${{ secrets.QUAY_BIOCONDA_TOKEN }}
 
     - if: ${{ github.ref == 'refs/heads/main' }}
-      name: Test Uploaded Image
+      name: Test Pushed
       run: |
         image='${{ steps.buildah-build.outputs.image }}'
         ids="$(
