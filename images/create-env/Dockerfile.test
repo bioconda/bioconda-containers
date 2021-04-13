@@ -28,8 +28,8 @@ RUN /opt/create-env/env-execute \
         --conda=mamba \
         --env-activate-args='--prefix-is-base' \
         --strip \
-        --remove-files=\*.a \
-        --remove-files=\*.pyc \
+        --remove-paths=\*.a \
+        --remove-paths=\*.pyc \
         /opt/conda \
         conda
 FROM bioconda/base-glibc-busybox-bash

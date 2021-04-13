@@ -19,9 +19,9 @@ according to specifications given by CONDA_CREATE_ARGS.
                               script. (default: PREFIX/env-activate.sh)
   --env-execute-script=FILE   Destination path of environment execution script.
                               (default: PREFIX/env-execute)
-  --remove-files=GLOB         Glob of files to remove from PREFIX after its
-                              creation. Can be passed on multiple times.
-                              Will be passed on to `find ... -path GLOB`.
+  --remove-paths=GLOB         Glob of paths to remove from PREFIX after its
+                              creation. Can be passed on multiple times. Will
+                              be passed on to `find -path PREFIX/GLOB`.
                               (no default)
   --strip[=yes|=no]           Option to run `strip` on all files in PREFIX.
                               (default: no)
@@ -46,11 +46,11 @@ end-of-help
     --env-execute-script=* )
       env_execute_file="${arg#--env-execute-script=}"
       shift ;;
-    --remove-files=* )
-      remove_files_globs="$(
+    --remove-paths=* )
+      remove_paths_globs="$(
         printf '%s\n' \
-          ${remove_files_globs+"${remove_files_globs}"} \
-          "${arg#--remove-files=}"
+          ${remove_paths_globs+"${remove_paths_globs}"} \
+          "${arg#--remove-paths=}"
       )"
       shift ;;
     --strip=yes | --strip )
@@ -83,7 +83,7 @@ create_command="${create_command-create}"
 env_activate_args="--prefix='${prefix}' ${env_activate_args-}"
 env_activate_file="${env_activate_file-"${prefix}/env-activate.sh"}"
 env_execute_file="${env_execute_file-"${prefix}/env-execute"}"
-remove_files_globs="$( printf '%s\n' "${remove_files_globs-}" | sort -u )"
+remove_paths_globs="$( printf '%s\n' "${remove_paths_globs-}" | sort -u )"
 strip="${strip-0}"
 licenses_path="${licenses_path-conda-meta}"
 
@@ -94,7 +94,7 @@ set -u
 
 printf 'creating environment at %s ...\n' "${prefix}" 1>&2
 # Use CONDA_ALWAYS_COPY=1 to cut links to package cache.
-# (Which is esp. important if --strip or --remove-files are used!)
+# (Which is esp. important if --strip or --remove-paths are used!)
 CONDA_YES=1 \
   CONDA_ALWAYS_COPY="${CONDA_ALWAYS_COPY:-1}" \
   ${conda_impl} \
@@ -126,11 +126,12 @@ if [ -n "${env_activate_file}${env_execute_file}" ] ; then
   fi
 fi
 
-if [ -n "${remove_files_globs}" ] ; then
-  printf 'removing files from %s ...\n' "${prefix}" 1>&2
+
+if [ -n "${remove_paths_globs}" ] ; then
+  printf 'removing paths from %s ...\n' "${prefix}" 1>&2
   (
     eval "set -- $(
-      printf %s "${remove_files_globs}" \
+      printf %s "${remove_paths_globs}" \
         | sed -e "s|.*|-path '${prefix}/&'|" -e '1!s/^/-o /' \
         | tr '\n' ' '
     )"

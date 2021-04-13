@@ -75,8 +75,8 @@ CONDA_PKGS_DIRS="${miniconda_boostrap_prefix}/pkgs" \
   create-env \
     --conda=: \
     --strip \
-    --remove-files=\*.a \
-    --remove-files=\*.pyc \
+    --remove-paths=\*.a \
+    --remove-paths=\*.pyc \
     --env-activate-args=--prefix-is-base \
     "${conda_install_prefix}"
 
