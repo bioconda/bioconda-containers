@@ -122,7 +122,7 @@ if [ -n "${env_activate_file}${env_execute_file}" ] ; then
   if [ -n "${env_execute_file-}" ] ; then
     printf 'writing execution script to %s ...\n' "${env_execute_file}" 1>&2
     printf '%s\n' \
-      '#! /bin/sh' \
+      '#! /bin/bash' \
       "${activate_script}" \
       'exec "${@}"' \
       > "${env_execute_file}"

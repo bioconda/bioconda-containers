@@ -11,6 +11,10 @@
 
 - Replace `CONDA_ALWAYS_COPY=1` usage by config option
 
+- Use `/bin/bash` for entrypoints
+
+  `/bin/sh` fails on some Conda packages' activations scripts' Bashisms.
+
 
 ## bioconda/create-env 1.2.1 (2021-04-09)
 

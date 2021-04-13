@@ -1,4 +1,4 @@
-#! /bin/sh -eu
+#! /bin/bash -eu
 
 version="${1}"
 conda_install_prefix="${2}"
