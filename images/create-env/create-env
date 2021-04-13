@@ -23,8 +23,12 @@ according to specifications given by CONDA_CREATE_ARGS.
                               creation. Can be passed on multiple times. Will
                               be passed on to `find -path PREFIX/GLOB`.
                               (no default)
-  --strip[=yes|=no]           Option to run `strip` on all files in PREFIX.
-                              (default: no)
+  --strip-files=GLOB          Glob of paths in PREFIX to run `strip` on. Will
+                              be passed on to `find -type f -path PREFIX/GLOB`.
+                              Error messages from `strip` are suppressed, i.e.,
+                              --strip-files=* may be used to run `strip` on all
+                              files. Can be passed on multiple times.
+                              (no default)
   --licenses-path=PATH        Destination path to copy package license files
                               to (relative to PREFIX or absolute). Pass on
                               empty path (--licenses-path=) to skip copying.
@@ -53,10 +57,13 @@ end-of-help
           "${arg#--remove-paths=}"
       )"
       shift ;;
-    --strip=yes | --strip )
-      strip=1 ; shift ;;
-    --strip=no )
-      strip=0 ; shift ;;
+    --strip-files=* )
+      strip_files_globs="$(
+        printf '%s\n' \
+          ${strip_files_globs+"${strip_files_globs}"} \
+          "${arg#--strip-files=}"
+      )"
+      shift ;;
     --licenses-path=* )
       licenses_path="${arg#--licenses-path=}"
       shift ;;
@@ -84,7 +91,7 @@ env_activate_args="--prefix='${prefix}' ${env_activate_args-}"
 env_activate_file="${env_activate_file-"${prefix}/env-activate.sh"}"
 env_execute_file="${env_execute_file-"${prefix}/env-execute"}"
 remove_paths_globs="$( printf '%s\n' "${remove_paths_globs-}" | sort -u )"
-strip="${strip-0}"
+strip_files_globs="$( printf '%s\n' "${strip_files_globs-}" | sort -u )"
 licenses_path="${licenses_path-conda-meta}"
 
 
@@ -94,7 +101,7 @@ set -u
 
 printf 'creating environment at %s ...\n' "${prefix}" 1>&2
 # Use CONDA_ALWAYS_COPY=1 to cut links to package cache.
-# (Which is esp. important if --strip or --remove-paths are used!)
+# (Which is esp. important if --strip-files or --remove-paths are used!)
 CONDA_YES=1 \
   CONDA_ALWAYS_COPY="${CONDA_ALWAYS_COPY:-1}" \
   ${conda_impl} \
@@ -141,16 +148,24 @@ if [ -n "${remove_paths_globs}" ] ; then
   )
 fi
 
-if [ "${strip}" = 1 ] ; then
+if [ -n "${strip_files_globs}" ] ; then
   # Ensure "strip" is available beforehand because errors are ignored later on.
   strip --version > /dev/null
   printf 'stripping binaries in %s ...\n' "${prefix}" 1>&2
-  # Strip binaries. (Run strip on all files; ignore errors for non-ELF files.)
-  find "${prefix}" \
-    -type f \
-    -exec strip {} \+ \
-    2> /dev/null \
-    || true
+  (
+    eval "set -- $(
+      printf %s "${strip_files_globs}" \
+        | sed -e "s|.*|-path '${prefix}/&'|" -e '1!s/^/-o /' \
+        | tr '\n' ' '
+    )"
+    # Strip binaries. (Run strip on all files; ignore errors for non-ELF files.)
+    find "${prefix}" \
+      -type f \
+      \( "${@}" \) \
+      -exec strip {} \+ \
+      2> /dev/null \
+      || true
+  )
 fi
 
 

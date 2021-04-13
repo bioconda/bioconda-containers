@@ -74,7 +74,7 @@ unset activate_script
 CONDA_PKGS_DIRS="${miniconda_boostrap_prefix}/pkgs" \
   create-env \
     --conda=: \
-    --strip \
+    --strip-files=\* \
     --remove-paths=\*.a \
     --remove-paths=\*.pyc \
     --env-activate-args=--prefix-is-base \
