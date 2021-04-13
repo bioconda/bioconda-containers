@@ -72,7 +72,7 @@ RUN touch /usr/local/env-activate.sh \
       /etc/profile.d/env-activate.sh \
     && \
     printf '%s\n' \
-      '#! /bin/sh' \
+      '#! /bin/bash' \
       ". '/usr/local/env-activate.sh'" \
       'exec "${@}"' \
       > /usr/local/env-execute

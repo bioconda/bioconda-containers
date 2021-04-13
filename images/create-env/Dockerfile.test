@@ -5,7 +5,7 @@ FROM "${base}" as build_bioconda_utils
 RUN /opt/create-env/env-execute \
       create-env \
         --conda=mamba \
-        --strip \
+        --strip-files=\* \
         /usr/local \
         bioconda-utils
 FROM bioconda/base-glibc-busybox-bash
@@ -27,9 +27,9 @@ RUN /opt/create-env/env-execute \
       create-env \
         --conda=mamba \
         --env-activate-args='--prefix-is-base' \
-        --strip \
-        --remove-files=\*.a \
-        --remove-files=\*.pyc \
+        --strip-files=\* \
+        --remove-paths=\*.a \
+        --remove-paths=\*.pyc \
         /opt/conda \
         conda
 FROM bioconda/base-glibc-busybox-bash

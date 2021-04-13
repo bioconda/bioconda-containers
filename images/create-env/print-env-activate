@@ -1,4 +1,4 @@
-#! /bin/sh -eu
+#! /bin/bash -eu
 
 for arg do
   case "${arg}" in

@@ -1,12 +1,12 @@
 ARG base=quay.io/bioconda/base-glibc-busybox-bash:2.0.0
 
-FROM quay.io/bioconda/create-env as build
+FROM quay.io/bioconda/create-env:2.0.0 as build
 RUN /opt/create-env/env-execute \
       create-env \
         --conda=mamba \
-        --strip \
-        --remove-files=\*.a \
-        --remove-files=\*.pyc \
+        --strip-files=\* \
+        --remove-paths=\*.a \
+        --remove-paths=\*.pyc \
         /usr/local \
         aiohttp \
         anaconda-client \

@@ -1,4 +1,4 @@
-#! /bin/sh -eu
+#! /bin/bash -eu
 
 version="${1}"
 conda_install_prefix="${2}"
@@ -74,9 +74,9 @@ unset activate_script
 CONDA_PKGS_DIRS="${miniconda_boostrap_prefix}/pkgs" \
   create-env \
     --conda=: \
-    --strip \
-    --remove-files=\*.a \
-    --remove-files=\*.pyc \
+    --strip-files=\* \
+    --remove-paths=\*.a \
+    --remove-paths=\*.pyc \
     --env-activate-args=--prefix-is-base \
     "${conda_install_prefix}"
 
@@ -95,6 +95,12 @@ conda config \
   || true
 conda config \
   --prepend repodata_fns repodata.json
+
+# Use `always_copy` to cut links to package cache.
+# (Which is esp. important if files are manipulated via --strip-files !)
+conda config \
+  --set always_copy true \
+  --set allow_softlinks false
 
 
 # Log information of the newly created Conda installation.
