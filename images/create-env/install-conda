@@ -96,6 +96,12 @@ conda config \
 conda config \
   --prepend repodata_fns repodata.json
 
+# Use `always_copy` to cut links to package cache.
+# (Which is esp. important if files are manipulated via --strip-files !)
+conda config \
+  --set always_copy true \
+  --set allow_softlinks false
+
 
 # Log information of the newly created Conda installation.
 # NB: Running conda after the .pyc removal will recreate some .pyc files.

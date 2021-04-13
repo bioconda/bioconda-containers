@@ -100,10 +100,7 @@ eval "$( conda shell.posix activate base )"
 set -u
 
 printf 'creating environment at %s ...\n' "${prefix}" 1>&2
-# Use CONDA_ALWAYS_COPY=1 to cut links to package cache.
-# (Which is esp. important if --strip-files or --remove-paths are used!)
 CONDA_YES=1 \
-  CONDA_ALWAYS_COPY="${CONDA_ALWAYS_COPY:-1}" \
   ${conda_impl} \
   ${create_command} \
   --prefix="${prefix}" \
