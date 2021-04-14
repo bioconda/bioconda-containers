@@ -36,7 +36,7 @@ Post-processing steps are triggered by arguments to `create-env`:
 
 ## Usage example:
 ```Dockerfile
-FROM quay.io/bioconda/create-env:2.0.0 as build
+FROM quay.io/bioconda/create-env:2.1.0 as build
 # Create an environment containing python=3.9 at /usr/local using mamba, strip
 # files and remove some less important files:
 RUN export CONDA_ADD_PIP_AS_PYTHON_DEPENDENCY=0 \
@@ -54,7 +54,7 @@ RUN export CONDA_ADD_PIP_AS_PYTHON_DEPENDENCY=0 \
 # The base image below (quay.io/bioconda/base-glibc-busybox-bash:2.0.0) defines
 # /usr/local/env-execute as the ENTRYPOINT so that created containers always
 # start in an activated environment.
-FROM quay.io/bioconda/base-glibc-busybox-bash:2.0.0 as target
+FROM quay.io/bioconda/base-glibc-busybox-bash:2.1.0 as target
 COPY --from=build /usr/local /usr/local
 
 FROM target as test

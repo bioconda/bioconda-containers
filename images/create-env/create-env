@@ -202,10 +202,11 @@ if [ -n "${licenses_path}" ] ; then
       find "${pkg_info}" \
         -maxdepth 1 \
         \( -name LICENSE.txt -o -name licenses \) \
-        -exec sh -c '
-          mkdir -p "${2}"
-          cp -flR "${1}" "${2}"
-        ' -- {} "${abs_licenses_path}/${pkg}" \; \
+        -exec sh -ec '
+          dest_dir="${1}" ; shift
+          mkdir -p "${dest_dir}"
+          cp -fR "${@}" "${dest_dir}/"
+        ' -- "${abs_licenses_path}/${pkg}" {} \+ \
         || {
           printf 'failed to copy licenses for %s\n' "${pkg}" 1>&2
           exit 1

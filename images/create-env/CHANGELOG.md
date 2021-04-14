@@ -1,6 +1,15 @@
 # Changelog
 
 
+## bioconda/create-env 2.1.0 (2021-04-14)
+
+### Changed
+
+- Copy instead of hardlink licenses, exit on error
+
+  Hardlink fails if copying spans cross devices (e.g., via bound volumes).
+
+
 ## bioconda/create-env 2.0.0 (2021-04-13)
 
 ### Changed
