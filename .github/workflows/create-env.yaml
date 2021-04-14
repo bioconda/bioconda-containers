@@ -16,7 +16,7 @@ jobs:
     name: Build & Push
     runs-on: ubuntu-18.04
     env:
-      IMAGE_VERSION: '2.0.0'
+      IMAGE_VERSION: '2.1.0'
       VERSION: '4.9.2'
       IMAGE_NAME: create-env
 
