@@ -65,15 +65,6 @@ async def all_checks_passed(session: ClientSession, sha: str) -> bool:
     return all(check_run["conclusion"] == "success" for check_run in check_runs)
 
 
-async def get_labeled_pr_and_sha(event: Dict[str, Any]) -> Optional[Tuple[int, str]]:
-    pull_request = event.get("pull_request")
-    if pull_request is None:
-        return None
-    if event["action"] != "labeled" or event["label"]["name"] != "automerge":
-        return None
-    return int(pull_request["number"]), pull_request["head"]["sha"]
-
-
 async def get_prs_for_sha(session: ClientSession, sha: str) -> List[int]:
     headers = {
         "User-Agent": "BiocondaCommentResponder",
@@ -118,10 +109,3 @@ async def main() -> None:
 
     if job_context["event_name"] == ["status"]:
         merge_automerge_passed(event)
-    else:
-        pr__sha = await get_labeled_pr_and_sha(event)
-        if pr__sha is not None:
-            pr, sha = pr__sha
-            async with ClientSession() as session:
-                if await all_checks_completed(session, sha):
-                    await request_merge(session, pr)
