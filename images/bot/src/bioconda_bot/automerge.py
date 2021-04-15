@@ -107,10 +107,13 @@ async def get_sha_for_check_suite(job_context: Dict[str, Any]) -> Optional[str]:
     check_suite = job_context["event"]["check_suite"]
     if check_suite["conclusion"] != "success":
         return None
-    pull_requests = check_suite.get("pull_requests")
-    if not pull_requests:
+    sha: Optional[str] = check_suite.get("head_sha")
+    if not sha:
+        pull_requests = check_suite.get("pull_requests")
+        if pull_requests:
+            sha = pull_requests[0]["head"]["sha"]
+    if not sha:
         return None
-    sha: Optional[str] = pull_requests[0]["head"]["sha"]
     return sha
 
 
