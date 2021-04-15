@@ -15,6 +15,7 @@ from yaml import safe_load
 from .common import (
     async_exec,
     fetch_pr_sha_artifacts,
+    get_job_context,
     get_pr_comment,
     get_pr_info,
     is_bioconda_member,
@@ -274,7 +275,8 @@ async def request_merge(session: ClientSession, pr: int) -> MergeState:
 
 # This requires that a JOB_CONTEXT environment variable, which is made with `toJson(github)`
 async def main() -> None:
-    job_context, issue_number, original_comment = await get_pr_comment()
+    job_context = await get_job_context()
+    issue_number, original_comment = await get_pr_comment(job_context)
     if issue_number is None or original_comment is None:
         return
 
