@@ -89,7 +89,7 @@ async def get_prs_for_sha(session: ClientSession, sha: str) -> List[int]:
 
 
 async def get_sha_for_status(job_context: Dict[str, Any]) -> Optional[str]:
-    if job_context["event_name"] != ["status"]:
+    if job_context["event_name"] != "status":
         return None
     event = job_context["event"]
     if event["state"] != "success":
@@ -102,7 +102,7 @@ async def get_sha_for_status(job_context: Dict[str, Any]) -> Optional[str]:
 
 
 async def get_sha_for_check_suite(job_context: Dict[str, Any]) -> Optional[str]:
-    if job_context["event_name"] != ["check_suite"]:
+    if job_context["event_name"] != "check_suite":
         return None
     check_suite = job_context["event"]["check_suite"]
     if check_suite["conclusion"] != "success":
@@ -129,4 +129,4 @@ async def main() -> None:
 
     sha = await get_sha_for_status(job_context) or await get_sha_for_check_suite(job_context)
     if sha:
-        merge_automerge_passed(sha)
+        await merge_automerge_passed(sha)
