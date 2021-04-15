@@ -4,6 +4,7 @@ import re
 import sys
 from asyncio import gather, sleep
 from asyncio.subprocess import create_subprocess_exec
+from enum import Enum, auto
 from pathlib import Path
 from shutil import which
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -22,6 +23,14 @@ from .common import (
 
 logger = logging.getLogger(__name__)
 log = logger.info
+
+
+class MergeState(Enum):
+    UNKNOWN = auto()
+    MERGEABLE = auto()
+    NOT_MERGEABLE = auto()
+    NEEDS_REVIEW = auto()
+    MERGED = auto()
 
 
 # Ensure there's at least one approval by a member
@@ -55,7 +64,7 @@ async def approval_review(session: ClientSession, issue_number: int) -> bool:
 # Check the mergeable state of a PR
 async def check_is_mergeable(
     session: ClientSession, issue_number: int, second_try: bool = False
-) -> bool:
+) -> MergeState:
     token = os.environ["BOT_TOKEN"]
     # Sleep a couple of seconds to allow the background process to finish
     if second_try:
@@ -80,9 +89,11 @@ async def check_is_mergeable(
         or not pr_info["mergeable"]
         or pr_info["mergeable_state"] != "clean"
     ):
-        return False
+        return MergeState.NOT_MERGEABLE
 
-    return await approval_review(session, issue_number)
+    if not await approval_review(session, issue_number):
+        return MergeState.NEEDS_REVIEW
+    return MergeState.MERGEABLE
 
 
 def parse_circle_ci_summary(summary: str) -> List[str]:
@@ -209,44 +220,40 @@ async def get_pr_commit_message(session: ClientSession, issue_number: int) -> st
 
 
 # Merge a PR
-async def merge_pr(session: ClientSession, pr: int) -> None:
+async def merge_pr(session: ClientSession, pr: int, init_message: str) -> MergeState:
     token = os.environ["BOT_TOKEN"]
-    await send_comment(
-        session,
-        pr,
-        "I will attempt to upload artifacts and merge this PR. This may take some time, please have patience.",
-    )
+    mergeable = await check_is_mergeable(session, pr)
+    log("mergeable state of %s is %s", pr, mergeable)
+    if mergeable is not MergeState.MERGEABLE:
+        return mergeable
 
+    if init_message:
+        await send_comment(session, pr, init_message)
     try:
-        mergeable = await check_is_mergeable(session, pr)
-        log("mergeable state of %s is %s", pr, mergeable)
-        if not mergeable:
-            await send_comment(session, pr, "Sorry, this PR cannot be merged at this time.")
-        else:
-            log("uploading artifacts")
-            sha = await upload_artifacts(session, pr)
-            log("artifacts uploaded")
+        log("uploading artifacts")
+        sha = await upload_artifacts(session, pr)
+        log("artifacts uploaded")
 
-            # Carry over last 250 commit messages
-            msg = await get_pr_commit_message(session, pr)
+        # Carry over last 250 commit messages
+        msg = await get_pr_commit_message(session, pr)
 
-            # Hit merge
-            url = f"https://api.github.com/repos/bioconda/bioconda-recipes/pulls/{pr}/merge"
-            headers = {
-                "Authorization": f"token {token}",
-                "User-Agent": "BiocondaCommentResponder",
-            }
-            payload = {
-                "sha": sha,
-                "commit_title": f"[ci skip] Merge PR {pr}",
-                "commit_message": f"Merge PR #{pr}, commits were: \n{msg}",
-                "merge_method": "squash",
-            }
-            log("Putting merge commit")
-            async with session.put(url, headers=headers, json=payload) as response:
-                rc = response.status
-            log("body %s", payload)
-            log("merge_pr the response code was %s", rc)
+        # Hit merge
+        url = f"https://api.github.com/repos/bioconda/bioconda-recipes/pulls/{pr}/merge"
+        headers = {
+            "Authorization": f"token {token}",
+            "User-Agent": "BiocondaCommentResponder",
+        }
+        payload = {
+            "sha": sha,
+            "commit_title": f"[ci skip] Merge PR {pr}",
+            "commit_message": f"Merge PR #{pr}, commits were: \n{msg}",
+            "merge_method": "squash",
+        }
+        log("Putting merge commit")
+        async with session.put(url, headers=headers, json=payload) as response:
+            rc = response.status
+        log("body %s", payload)
+        log("merge_pr the response code was %s", rc)
     except:
         await send_comment(
             session,
@@ -254,6 +261,15 @@ async def merge_pr(session: ClientSession, pr: int) -> None:
             "I received an error uploading the build artifacts or merging the PR!",
         )
         logger.exception("Upload failed", exc_info=True)
+    return MergeState.MERGED
+
+
+async def request_merge(session: ClientSession, pr: int) -> MergeState:
+    init_message = "I will attempt to upload artifacts and merge this PR. This may take some time, please have patience."
+    merged = await merge_pr(session, pr, init_message)
+    if merged is MergeState.NOT_MERGEABLE:
+        await send_comment(session, pr, "Sorry, this PR cannot be merged at this time.")
+    return merged
 
 
 # This requires that a JOB_CONTEXT environment variable, which is made with `toJson(github)`
@@ -266,4 +282,4 @@ async def main() -> None:
     if comment.startswith(("@bioconda-bot", "@biocondabot")):
         if " please merge" in comment:
             async with ClientSession() as session:
-                await merge_pr(session, issue_number)
+                await request_merge(session, issue_number)

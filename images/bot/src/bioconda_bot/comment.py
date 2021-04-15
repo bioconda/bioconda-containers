@@ -176,9 +176,9 @@ async def main() -> None:
                 await artifact_checker(session, issue_number)
             elif " please merge" in comment:
                 log("This should have been directly invoked via bioconda-bot-merge")
-                from .merge import merge_pr
+                from .merge import request_merge
 
-                await merge_pr(session, issue_number)
+                await request_merge(session, issue_number)
             elif " please add label" in comment:
                 await add_pr_label(session, issue_number)
                 await notify_ready(session, issue_number)
