@@ -9,8 +9,11 @@ from yaml import safe_load
 from .common import (
     async_exec,
     fetch_pr_sha_artifacts,
+    get_job_context,
     get_pr_comment,
     get_pr_info,
+    get_prs_for_sha,
+    get_sha_for_status_check,
     is_bioconda_member,
     send_comment,
 )
@@ -158,7 +161,17 @@ async def notify_ready(session: ClientSession, pr: int) -> None:
 
 # This requires that a JOB_CONTEXT environment variable, which is made with `toJson(github)`
 async def main() -> None:
-    job_context, issue_number, original_comment = await get_pr_comment()
+    job_context = await get_job_context()
+
+    sha = await get_sha_for_status_check(job_context)
+    if sha:
+        # This is a successful status or check_suite event => post artifact lists.
+        async with ClientSession() as session:
+            for pr in await get_prs_for_sha(session, sha):
+                await artifact_checker(session, pr)
+        return
+
+    issue_number, original_comment = await get_pr_comment(job_context)
     if issue_number is None or original_comment is None:
         return
 

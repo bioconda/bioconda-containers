@@ -5,6 +5,7 @@ from aiohttp import ClientSession
 
 from .common import (
     async_exec,
+    get_job_context,
     get_pr_comment,
     get_pr_info,
     send_comment,
@@ -65,7 +66,8 @@ async def update_from_master(session: ClientSession, pr: int) -> None:
 
 # This requires that a JOB_CONTEXT environment variable, which is made with `toJson(github)`
 async def main() -> None:
-    job_context, issue_number, original_comment = await get_pr_comment()
+    job_context = await get_job_context()
+    issue_number, original_comment = await get_pr_comment(job_context)
     if issue_number is None or original_comment is None:
         return
 
