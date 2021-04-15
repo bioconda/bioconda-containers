@@ -35,7 +35,7 @@ RUN . /opt/create-env/env-activate.sh && \
         --remove-paths=include/\* \
         --remove-paths=share/doc/\* \
         --remove-paths=share/man/\* \
-        --remove-paths=share/terminfo/\* \
+        --remove-paths='share/terminfo/[!x]/*' \
         --remove-paths=share/locale/\* \
         --remove-paths=lib/python*/ensurepip/\* \
         "${prefix}" \
@@ -73,13 +73,6 @@ RUN . "${prefix}/env-activate.sh" && \
     pip wheel --no-deps . \
     && \
     pip install --no-deps --find-links . bioconda_bot
-# Remove pip (wheel setuptools) which are not needed during runtime.
-RUN . /opt/create-env/env-activate.sh && \
-    conda remove \
-        --yes \
-        --force-remove \
-        --prefix="${prefix}" \
-        pip wheel setuptools
 
 FROM "${base}"
 COPY --from=build /usr/local /usr/local
