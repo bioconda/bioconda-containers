@@ -66,14 +66,12 @@ async def all_checks_passed(session: ClientSession, sha: str) -> bool:
 
 
 async def get_labeled_pr_and_sha(event: Dict[str, Any]) -> Optional[Tuple[int, str]]:
-    issue = event.get("issue")
-    if issue is None:
+    pull_request = event.get("pull_request")
+    if pull_request is None:
         return None
-    if issue.get("pull_request") is None:
+    if event["action"] != "labeled" or event["label"]["name"] != "automerge":
         return None
-    if event["event"] != "labeled" or event["label"]["name"] != "automerge":
-        return None
-    return int(issue["number"]), issue["head"]["sha"]
+    return int(pull_request["number"]), pull_request["head"]["sha"]
 
 
 async def get_prs_for_sha(session: ClientSession, sha: str) -> List[int]:
@@ -99,9 +97,10 @@ async def get_prs_for_sha(session: ClientSession, sha: str) -> List[int]:
 
 
 async def merge_automerge_passed(event: Dict[str, Any]) -> None:
-    if event["event"] != ["status"]:
+    branches = event.get("branches")
+    if not branches:
         return
-    sha = event.get("sha")
+    sha = branches[0]["commit"]["sha"]
     if not sha:
         return
     async with ClientSession() as session:
@@ -117,7 +116,7 @@ async def main() -> None:
     job_context = await get_job_context()
     event = job_context["event"]
 
-    if event["event"] == ["status"]:
+    if job_context["event_name"] == ["status"]:
         merge_automerge_passed(event)
     else:
         pr__sha = await get_labeled_pr_and_sha(event)
