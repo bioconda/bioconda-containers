@@ -174,6 +174,16 @@ async def get_sha_for_check_suite(job_context: Dict[str, Any]) -> Optional[str]:
     return sha
 
 
+async def get_sha_for_review(job_context: Dict[str, Any]) -> Optional[str]:
+    if job_context["event_name"] != "pull_request_review":
+        return None
+    event = job_context["event"]
+    if event["review"]["state"] != "approved":
+        return None
+    sha: Optional[str] = event["pull_request"]["head"]["sha"]
+    return sha
+
+
 async def get_prs_for_sha(session: ClientSession, sha: str) -> List[int]:
     headers = {
         "User-Agent": "BiocondaCommentResponder",
