@@ -9,7 +9,6 @@ from yaml import safe_load
 from .common import (
     get_job_context,
     get_prs_for_sha,
-    get_sha_for_review,
     get_sha_for_status_check,
 )
 from .merge import MergeState, request_merge
@@ -99,10 +98,38 @@ async def merge_automerge_passed(sha: str) -> None:
                 break
 
 
+async def get_sha_for_review(job_context: Dict[str, Any]) -> Optional[str]:
+    if job_context["event_name"] != "pull_request_review":
+        return None
+    log("Got %s event", "pull_request_review")
+    event = job_context["event"]
+    if event["review"]["state"] != "approved":
+        return None
+    sha: Optional[str] = event["pull_request"]["head"]["sha"]
+    log("Use %s event SHA %s", "pull_request_review", sha)
+    return sha
+
+
+async def get_sha_for_labeled_pr(job_context: Dict[str, Any]) -> Optional[str]:
+    if job_context["event_name"] != "pull_request":
+        return None
+    log("Got %s event", "pull_request")
+    event = job_context["event"]
+    if event["action"] != "labeled" or event["label"]["name"] != "automerge":
+        return None
+    sha: Optional[str] = event["pull_request"]["head"]["sha"]
+    log("Use %s event SHA %s", "pull_request", sha)
+    return sha
+
+
 # This requires that a JOB_CONTEXT environment variable, which is made with `toJson(github)`
 async def main() -> None:
     job_context = await get_job_context()
 
-    sha = await get_sha_for_status_check(job_context) or await get_sha_for_review(job_context)
+    sha = (
+        await get_sha_for_status_check(job_context)
+        or await get_sha_for_review(job_context)
+        or await get_sha_for_labeled_pr(job_context)
+    )
     if sha:
         await merge_automerge_passed(sha)
