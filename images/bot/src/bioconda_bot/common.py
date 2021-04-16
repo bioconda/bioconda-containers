@@ -148,6 +148,7 @@ async def fetch_pr_sha_artifacts(session: ClientSession, pr: int, sha: str) -> L
 async def get_sha_for_status(job_context: Dict[str, Any]) -> Optional[str]:
     if job_context["event_name"] != "status":
         return None
+    log("Got %s event", "status")
     event = job_context["event"]
     if event["state"] != "success":
         return None
@@ -155,12 +156,14 @@ async def get_sha_for_status(job_context: Dict[str, Any]) -> Optional[str]:
     if not branches:
         return None
     sha: Optional[str] = branches[0]["commit"]["sha"]
+    log("Use %s event SHA %s", "status", sha)
     return sha
 
 
 async def get_sha_for_check_suite(job_context: Dict[str, Any]) -> Optional[str]:
     if job_context["event_name"] != "check_suite":
         return None
+    log("Got %s event", "check_suite")
     check_suite = job_context["event"]["check_suite"]
     if check_suite["conclusion"] != "success":
         return None
@@ -171,16 +174,19 @@ async def get_sha_for_check_suite(job_context: Dict[str, Any]) -> Optional[str]:
             sha = pull_requests[0]["head"]["sha"]
     if not sha:
         return None
+    log("Use %s event SHA %s", "check_suite", sha)
     return sha
 
 
 async def get_sha_for_review(job_context: Dict[str, Any]) -> Optional[str]:
     if job_context["event_name"] != "pull_request_review":
         return None
+    log("Got %s event", "pull_request_review")
     event = job_context["event"]
     if event["review"]["state"] != "approved":
         return None
     sha: Optional[str] = event["pull_request"]["head"]["sha"]
+    log("Use %s event SHA %s", "pull_request_review", sha)
     return sha
 
 

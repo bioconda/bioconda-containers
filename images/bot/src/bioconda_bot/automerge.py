@@ -53,29 +53,45 @@ async def get_check_runs(session: ClientSession, sha: str) -> Any:
     async with session.get(url, headers=headers) as response:
         response.raise_for_status()
         res = await response.text()
-    check_runs = safe_load(res)
-    return check_runs["check_runs"]
+    check_runs = safe_load(res)["check_runs"]
+    log("Got %d check_runs for SHA %s", len(check_runs or []), sha)
+    return check_runs
 
 
 async def all_checks_completed(session: ClientSession, sha: str) -> bool:
     check_runs = await get_check_runs(session, sha)
 
-    return all(check_run["status"] == "completed" for check_run in check_runs)
+    is_all_completed = all(check_run["status"] == "completed" for check_run in check_runs)
+    if not is_all_completed:
+        log("Some check_runs are not completed yet.")
+        for i, check_run in enumerate(check_runs, 1):
+            log("check_run %d / %d: %s", i, len(check_runs), check_run)
+    return is_all_completed
 
 
 async def all_checks_passed(session: ClientSession, sha: str) -> bool:
     check_runs = await get_check_runs(session, sha)
 
     # TODO: "neutral" and "skipped" might be valid conclusions to consider in the future.
-    return all(check_run["conclusion"] == "success" for check_run in check_runs)
+    is_all_success = all(check_run["conclusion"] == "success" for check_run in check_runs)
+    if not is_all_success:
+        log("Some check_runs are not successful yet.")
+        for i, check_run in enumerate(check_runs, 1):
+            log("check_run %d / %d: %s", i, len(check_runs), check_run)
+    return is_all_success
 
 
 async def merge_automerge_passed(sha: str) -> None:
     async with ClientSession() as session:
         if not await all_checks_passed(session, sha):
             return
-        for pr in await get_prs_for_sha(session, sha):
-            if await merge_if_labeled(session, pr) is MergeState.MERGED:
+        prs = await get_prs_for_sha(session, sha)
+        if not prs:
+            log("No PRs found for SHA %s", sha)
+        for pr in prs:
+            merge_state = await merge_if_labeled(session, pr)
+            log("PR %d has merge state %s", pr, merge_state)
+            if merge_state is MergeState.MERGED:
                 break
 
 
