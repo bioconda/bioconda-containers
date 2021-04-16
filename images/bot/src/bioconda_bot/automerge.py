@@ -6,7 +6,12 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from aiohttp import ClientSession
 from yaml import safe_load
 
-from .common import get_job_context, get_prs_for_sha, get_sha_for_status_check
+from .common import (
+    get_job_context,
+    get_prs_for_sha,
+    get_sha_for_review,
+    get_sha_for_status_check,
+)
 from .merge import MergeState, request_merge
 
 logger = logging.getLogger(__name__)
@@ -78,6 +83,6 @@ async def merge_automerge_passed(sha: str) -> None:
 async def main() -> None:
     job_context = await get_job_context()
 
-    sha = await get_sha_for_status_check(job_context)
+    sha = await get_sha_for_status_check(job_context) or await get_sha_for_review(job_context)
     if sha:
         await merge_automerge_passed(sha)
