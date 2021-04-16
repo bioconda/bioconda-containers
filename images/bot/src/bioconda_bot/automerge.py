@@ -53,7 +53,11 @@ async def get_check_runs(session: ClientSession, sha: str) -> Any:
     async with session.get(url, headers=headers) as response:
         response.raise_for_status()
         res = await response.text()
-    check_runs = safe_load(res)["check_runs"]
+    check_runs = [
+        check_run
+        for check_run in safe_load(res)["check_runs"] or []
+        if check_run["name"] != "bioconda-bot automerge"
+    ]
     log("Got %d check_runs for SHA %s", len(check_runs or []), sha)
     return check_runs
 
