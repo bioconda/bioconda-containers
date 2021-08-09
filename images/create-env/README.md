@@ -51,7 +51,7 @@ RUN export CONDA_ADD_PIP_AS_PYTHON_DEPENDENCY=0 \
         /usr/local \
         python=3.9
 
-# The base image below (quay.io/bioconda/base-glibc-busybox-bash:2.0.0) defines
+# The base image below (quay.io/bioconda/base-glibc-busybox-bash:2.1.0) defines
 # /usr/local/env-execute as the ENTRYPOINT so that created containers always
 # start in an activated environment.
 FROM quay.io/bioconda/base-glibc-busybox-bash:2.1.0 as target

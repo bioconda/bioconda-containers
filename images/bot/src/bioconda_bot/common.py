@@ -160,22 +160,32 @@ async def get_sha_for_status(job_context: Dict[str, Any]) -> Optional[str]:
     return sha
 
 
-async def get_sha_for_check_suite(job_context: Dict[str, Any]) -> Optional[str]:
-    if job_context["event_name"] != "check_suite":
+async def get_sha_for_check_suite_or_workflow(
+    job_context: Dict[str, Any], event_name: str
+) -> Optional[str]:
+    if job_context["event_name"] != event_name:
         return None
-    log("Got %s event", "check_suite")
-    check_suite = job_context["event"]["check_suite"]
-    if check_suite["conclusion"] != "success":
+    log("Got %s event", event_name)
+    event_source = job_context["event"][event_name]
+    if event_source["conclusion"] != "success":
         return None
-    sha: Optional[str] = check_suite.get("head_sha")
+    sha: Optional[str] = event_source.get("head_sha")
     if not sha:
-        pull_requests = check_suite.get("pull_requests")
+        pull_requests = event_source.get("pull_requests")
         if pull_requests:
             sha = pull_requests[0]["head"]["sha"]
     if not sha:
         return None
-    log("Use %s event SHA %s", "check_suite", sha)
+    log("Use %s event SHA %s", event_name, sha)
     return sha
+
+
+async def get_sha_for_check_suite(job_context: Dict[str, Any]) -> Optional[str]:
+    return await get_sha_for_check_suite_or_workflow(job_context, "check_suite")
+
+
+async def get_sha_for_workflow_run(job_context: Dict[str, Any]) -> Optional[str]:
+    return await get_sha_for_check_suite_or_workflow(job_context, "workflow_run")
 
 
 async def get_prs_for_sha(session: ClientSession, sha: str) -> List[int]:
