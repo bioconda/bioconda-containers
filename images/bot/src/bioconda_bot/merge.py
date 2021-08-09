@@ -82,10 +82,13 @@ async def check_is_mergeable(
         res = await response.text()
     pr_info = safe_load(res)
 
+    if pr_info.get("merged"):
+        return MergeState.MERGED
+
     # We need mergeable == true and mergeable_state == clean, an approval by a member and
     if pr_info.get("mergeable") is None and not second_try:
         return await check_is_mergeable(session, issue_number, True)
-    elif (
+    if (
         pr_info.get("mergeable") is None
         or not pr_info["mergeable"]
         or pr_info["mergeable_state"] != "clean"

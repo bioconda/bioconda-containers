@@ -10,6 +10,7 @@ from .common import (
     get_job_context,
     get_prs_for_sha,
     get_sha_for_status_check,
+    get_sha_for_workflow_run,
 )
 from .merge import MergeState, request_merge
 
@@ -128,6 +129,7 @@ async def main() -> None:
 
     sha = (
         await get_sha_for_status_check(job_context)
+        or await get_sha_for_workflow_run(job_context)
         or await get_sha_for_review(job_context)
         or await get_sha_for_labeled_pr(job_context)
     )
