@@ -88,6 +88,11 @@ async def check_is_mergeable(
     # We need mergeable == true and mergeable_state == clean, an approval by a member and
     if pr_info.get("mergeable") is None and not second_try:
         return await check_is_mergeable(session, issue_number, True)
+
+    # Check approved reviews beforehand because we (somehow?) get NOT_MERGEABLE otherwise.
+    if not await approval_review(session, issue_number):
+        return MergeState.NEEDS_REVIEW
+
     if (
         pr_info.get("mergeable") is None
         or not pr_info["mergeable"]
@@ -95,8 +100,6 @@ async def check_is_mergeable(
     ):
         return MergeState.NOT_MERGEABLE
 
-    if not await approval_review(session, issue_number):
-        return MergeState.NEEDS_REVIEW
     return MergeState.MERGEABLE
 
 
@@ -271,7 +274,13 @@ async def merge_pr(session: ClientSession, pr: int, init_message: str) -> MergeS
 async def request_merge(session: ClientSession, pr: int) -> MergeState:
     init_message = "I will attempt to upload artifacts and merge this PR. This may take some time, please have patience."
     merged = await merge_pr(session, pr, init_message)
-    if merged is MergeState.NOT_MERGEABLE:
+    if merged is MergeState.NEEDS_REVIEW:
+        await send_comment(
+            session,
+            pr,
+            "Sorry, this PR cannot be merged until it's approved by a Bioconda member.",
+        )
+    elif merged is MergeState.NOT_MERGEABLE:
         await send_comment(session, pr, "Sorry, this PR cannot be merged at this time.")
     return merged
 
