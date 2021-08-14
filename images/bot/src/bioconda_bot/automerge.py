@@ -76,13 +76,14 @@ async def all_checks_completed(session: ClientSession, sha: str) -> bool:
 async def all_checks_passed(session: ClientSession, sha: str) -> bool:
     check_runs = await get_check_runs(session, sha)
 
-    # TODO: "neutral" and "skipped" might be valid conclusions to consider in the future.
-    is_all_success = all(check_run["conclusion"] == "success" for check_run in check_runs)
-    if not is_all_success:
-        log("Some check_runs are not successful yet.")
+    # TODO: "neutral" might be a valid conclusion to consider in the future.
+    valid_conclusions = {"success", "skipped"}
+    if any(check_run["conclusion"] not in valid_conclusions for check_run in check_runs):
+        log(f"Some check_runs are not marked as {'/'.join(valid_conclusions} yet.")
         for i, check_run in enumerate(check_runs, 1):
             log("check_run %d / %d: %s", i, len(check_runs), check_run)
-    return is_all_success
+        return False
+    return True
 
 
 async def merge_automerge_passed(sha: str) -> None:
