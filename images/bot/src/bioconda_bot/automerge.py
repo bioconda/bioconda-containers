@@ -79,7 +79,7 @@ async def all_checks_passed(session: ClientSession, sha: str) -> bool:
     # TODO: "neutral" might be a valid conclusion to consider in the future.
     valid_conclusions = {"success", "skipped"}
     if any(check_run["conclusion"] not in valid_conclusions for check_run in check_runs):
-        log(f"Some check_runs are not marked as {'/'.join(valid_conclusions} yet.")
+        log(f"Some check_runs are not marked as {'/'.join(valid_conclusions)} yet.")
         for i, check_run in enumerate(check_runs, 1):
             log("check_run %d / %d: %s", i, len(check_runs), check_run)
         return False
