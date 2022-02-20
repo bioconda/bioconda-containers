@@ -10,6 +10,7 @@ from pathlib import Path
 from shutil import which
 from subprocess import check_call
 from typing import Any, Dict, List, Optional, Set, Tuple
+from zipfile import ZipFile
 
 from aiohttp import ClientSession
 from yaml import safe_load
@@ -49,49 +50,64 @@ async def send_comment(session: ClientSession, issue_number: int, message: str) 
             sys.exit(1)
 
 
-# Parse the summary string returned by github to get the CircleCI run ID
-# Given a CircleCI run ID, return a list of its tarball artifacts
-async def fetch_artifacts(session: ClientSession, circle_ci_id: str) -> Set[str]:
-    url = f"https://circleci.com/api/v1.1/project/github/bioconda/bioconda-recipes/{circle_ci_id}/artifacts"
-    log("contacting circleci %s", url)
+def list_zip_contents(fname: str) -> [str]:
+    f = ZipFile(fname)
+    return [e.filename for e in f.infolist() if e.filename.endswith('.tar.gz') or e.filename.endswith('.tar.bz2')]
+
+
+# Download a zip file from url to zipName.zip and return that path
+# Timeout is 30 minutes to compensate for any network issues
+async def download_file(session: ClientSession, zipName: str, url: str) -> str:
+    async with session.get(url, timeout=60*30) as response:
+        if response.status == 200:
+            ofile = f"{zipName}.zip"
+            with open(ofile, 'wb') as fd:
+                while True:
+                    chunk = await response.content.read(1024*1024*1024)
+                    if not chunk:
+                        break
+                    fd.write(chunk)
+            return ofile
+    return None
+
+
+# Find artifact zip files, download them and return their URLs and contents
+async def fetch_azure_zip_files(session: ClientSession, buildId: str) -> [(str, str)]:
+    artifacts = []
+
+    url = f"https://dev.azure.com/bioconda/bioconda-recipes/_apis/build/builds/{buildId}/artifacts?api-version=4.1"
+    log("contacting azure %s", url)
     async with session.get(url) as response:
         # Sometimes we get a 301 error, so there are no longer artifacts available
         if response.status == 301:
-            return set()
+            return artifacts
         res = await response.text()
 
-    if len(res) < 3:
-        return set()
-
-    res = res.replace("(", "[").replace(")", "]")
-    res = res.replace("} ", "}, ")
-    res = res.replace(":node-index", '"node-index":')
-    res = res.replace(":path", '"path":')
-    res = res.replace(":pretty-path", '"pretty-path":')
-    res = res.replace(":url", '"url":')
     res_object = safe_load(res)
-    artifacts = {
-        artifact["url"]
-        for artifact in res_object
-        if artifact["url"].endswith(
-            (
-                ".tar.gz",
-                ".tar.bz2",
-                "/repodata.json",
-            )
-        )
-    }
+    if res_object['count'] == 0:
+        return artifacts
+
+    for artifact in res_object['value']:
+        zipName = artifact['name']  # LinuxArtifacts or OSXArtifacts
+        zipUrl = artifact['resource']['downloadUrl']
+        log(f"zip name is {zipName} url {zipUrl}")
+        fname = await download_file(session, zipName, zipUrl)
+        if not fname:
+            continue
+        pkgsImages = list_zip_contents(fname)
+        for pkg in pkgsImages:
+            artifacts.append((zipUrl, pkg))
+
     return artifacts
 
 
-def parse_circle_ci_summary(summary: str) -> List[str]:
-    return re.findall(r"gh/bioconda/bioconda-recipes/(\d+)", summary)
+def parse_azure_build_id(url: str) -> str:
+    return re.search("buildId=(\d+)", url).group(1)
 
 
-# Given a PR and commit sha, fetch a list of the artifacts
-async def fetch_pr_sha_artifacts(session: ClientSession, pr: int, sha: str) -> List[str]:
+# Given a PR and commit sha, fetch a list of the artifact zip files URLs and their contents
+async def fetch_pr_sha_artifacts(session: ClientSession, pr: int, sha: str) -> List[Tuple[str, str]]:
     url = f"https://api.github.com/repos/bioconda/bioconda-recipes/commits/{sha}/check-runs"
-    artifacts: List[str] = []
 
     headers = {
         "User-Agent": "BiocondaCommentResponder",
@@ -103,77 +119,72 @@ async def fetch_pr_sha_artifacts(session: ClientSession, pr: int, sha: str) -> L
     check_runs = safe_load(res)
 
     for check_run in check_runs["check_runs"]:
-        if check_run["output"]["title"] == "Workflow: bioconda-test":
-            # The circleci IDs are embedded in a string in output:summary
-            circle_ci_ids = parse_circle_ci_summary(check_run["output"]["summary"])
-            for item in circle_ci_ids:
-                artifact = await fetch_artifacts(session, item)
-                artifacts.extend(artifact)
-    return artifacts
+        # The names are "bioconda.bioconda-recipes (test_osx test_osx)" or similar
+        if check_run["name"].startswith("bioconda.bioconda-recipes (test_"):
+            # The azure build ID is in the details_url as buildId=\d+
+            buildID = parse_azure_build_id(check_run["details_url"])
+            zipFiles = await fetch_azure_zip_files(session, buildID)
+            return zipFiles  # We've already fetched all possible artifacts
+
+    return []
 
 
 # Given a PR and commit sha, post a comment with any artifacts
 async def make_artifact_comment(session: ClientSession, pr: int, sha: str) -> None:
     artifacts = await fetch_pr_sha_artifacts(session, pr, sha)
-    nPackages = sum(1 for artifact in artifacts if artifact.endswith((".tar.bz2", "tar.gz")))
+    nPackages = len(artifacts)
 
     if nPackages > 0:
-        # If a package artifact is found, the accompanying repodata is the preceeding item in artifacts
-        comment = "Package(s) built on CircleCI are ready for inspection:\n\n"
-        comment += "Arch | Package | Repodata\n-----|---------|---------\n"
+        comment = "Package(s) built on Azure are ready for inspection:\n\n"
+        comment += "Arch | Package | Zip File\n-----|---------|---------\n"
         install_noarch = ""
         install_linux = ""
         install_osx = ""
 
         # Table of packages and repodata.json
-        for artifact in artifacts:
-            if not (package_match := re.match(r"^((.+)\/(.+)\/(.+\.tar\.bz2))$", artifact)):
+        for URL, artifact in artifacts:
+            if not (package_match := re.match(r"^((.+)\/(.+)\/(.+)\/(.+\.tar\.bz2))$", artifact)):
                 continue
-            url, basedir, subdir, packageName = package_match.groups()
-            repo_url = "/".join([basedir, subdir, "repodata.json"])
-            conda_install_url = basedir
+            url, archdir, basedir, subdir, packageName = package_match.groups()
+            urlBase = URL[:-3]  # trim off zip from format=
+            urlBase += "file&subPath=%2F{}".format("%2F".join([basedir, subdir]))
+            conda_install_url = urlBase
+            # N.B., the zip file URL is nearly identical to the URL for the individual member files. It's unclear if there's an API for getting the correct URL to the files themselves
+            #pkgUrl = "%2F".join([urlBase, packageName])
+            #repoUrl = "%2F".join([urlBase, "current_repodata.json"])
+            #resp = await session.get(repoUrl)
 
             if subdir == "noarch":
                 comment += "noarch |"
-                install_noarch = (
-                    f"```\nconda install -c {conda_install_url} <package name>\n```\n"
-                )
             elif subdir == "linux-64":
                 comment += "linux-64 |"
-                install_linux = (
-                    f"```\nconda install -c {conda_install_url} <package name>\n```\n"
-                )
             else:
                 comment += "osx-64 |"
-                install_osx = f"```\nconda install -c {conda_install_url} <package name>\n```\n"
-            comment += f" [{packageName}]({url}) | [repodata.json]({repo_url})\n"
+            comment += f" {packageName} | [{archdir}]({URL})\n"
 
         # Conda install examples
-        comment += "***\n\nYou may also use `conda` to install these:\n\n"
-        if install_noarch:
-            comment += f" * For packages on noarch:\n{install_noarch}"
-        if install_linux:
-            comment += f" * For packages on linux-64:\n{install_linux}"
-        if install_osx:
-            comment += f" * For packages on osx-64:\n{install_osx}"
+        comment += "***\n\nYou may also use `conda` to install these after downloading and extracting the appropriate zip file. From the LinuxArtifacts or OSXArtifacts directories:\n\n"
+        comment += "```conda install -c packages <package name>\n```\n"
 
         # Table of containers
-        comment += "***\n\nDocker image(s) built:\n\n"
+        comment += "***\n\nDocker image(s) built (images are in the LinuxArtifacts zip file above):\n\n"
         comment += "Package | Tag | Install with `docker`\n"
         comment += "--------|-----|----------------------\n"
 
-        for artifact in artifacts:
+        for URL, artifact in artifacts:
             if artifact.endswith(".tar.gz"):
                 image_name = artifact.split("/").pop()[: -len(".tar.gz")]
-                if "%3A" in image_name:
-                    package_name, tag = image_name.split("%3A", 1)
-                    comment += f"[{package_name}]({artifact}) | {tag} | "
-                    comment += f'<details><summary>show</summary>`curl -L "{artifact}" \\| gzip -dc \\| docker load`\n'
+                if ':' in image_name:
+                    package_name, tag = image_name.split(':', 1)
+                    #image_url = URL[:-3]  # trim off zip from format=
+                    #image_url += "file&subPath=%2F{}.tar.gz".format("%2F".join(["images", '%3A'.join([package_name, tag])]))
+                    comment += f"[{package_name}] | {tag} | "
+                    comment += f'<details><summary>show</summary>`gzip -dc LinuxArtifacts/images/{image_name}.tar.gz \\| docker load`\n'
         comment += "\n\n"
     else:
         comment = (
-            "No artifacts found on the most recent CircleCI build. "
-            "Either the build failed or the recipe was blacklisted/skipped."
+            "No artifacts found on the most recent Azure build. "
+            "Either the build failed, the artifacts have were removed due to age, or the recipe was blacklisted/skipped."
         )
     await send_comment(session, pr, comment)
 
@@ -579,7 +590,8 @@ async def main() -> None:
             elif " please fetch artifacts" in comment or " please fetch artefacts" in comment:
                 await artifact_checker(session, issue_number)
             elif " please merge" in comment:
-                await merge_pr(session, issue_number)
+                await send_comment(session, issue_number, "Sorry, I'm currently disabled")
+                #await merge_pr(session, issue_number)
             elif " please add label" in comment:
                 await add_pr_label(session, issue_number)
                 await notify_ready(session, issue_number)
