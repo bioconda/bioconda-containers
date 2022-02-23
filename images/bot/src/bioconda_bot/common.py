@@ -82,49 +82,64 @@ async def get_pr_info(session: ClientSession, pr: int) -> Any:
     return pr_info
 
 
-def parse_circle_ci_summary(summary: str) -> List[str]:
-    return re.findall(r"gh/bioconda/bioconda-recipes/(\d+)", summary)
+def list_zip_contents(fname: str) -> [str]:
+    f = ZipFile(fname)
+    return [e.filename for e in f.infolist() if e.filename.endswith('.tar.gz') or e.filename.endswith('.tar.bz2')]
 
 
-# Parse the summary string returned by github to get the CircleCI run ID
-# Given a CircleCI run ID, return a list of its tarball artifacts
-async def fetch_artifacts(session: ClientSession, circle_ci_id: str) -> Set[str]:
-    url = f"https://circleci.com/api/v1.1/project/github/bioconda/bioconda-recipes/{circle_ci_id}/artifacts"
-    log("contacting circleci %s", url)
+# Download a zip file from url to zipName.zip and return that path
+# Timeout is 30 minutes to compensate for any network issues
+async def download_file(session: ClientSession, zipName: str, url: str) -> str:
+    async with session.get(url, timeout=60*30) as response:
+        if response.status == 200:
+            ofile = f"{zipName}.zip"
+            with open(ofile, 'wb') as fd:
+                while True:
+                    chunk = await response.content.read(1024*1024*1024)
+                    if not chunk:
+                        break
+                    fd.write(chunk)
+            return ofile
+    return None
+
+
+# Find artifact zip files, download them and return their URLs and contents
+async def fetch_azure_zip_files(session: ClientSession, buildId: str) -> [(str, str)]:
+    artifacts = []
+
+    url = f"https://dev.azure.com/bioconda/bioconda-recipes/_apis/build/builds/{buildId}/artifacts?api-version=4.1"
+    log("contacting azure %s", url)
     async with session.get(url) as response:
         # Sometimes we get a 301 error, so there are no longer artifacts available
         if response.status == 301:
-            return set()
+            return artifacts
         res = await response.text()
 
-    if len(res) < 3:
-        return set()
-
-    res = res.replace("(", "[").replace(")", "]")
-    res = res.replace("} ", "}, ")
-    res = res.replace(":node-index", '"node-index":')
-    res = res.replace(":path", '"path":')
-    res = res.replace(":pretty-path", '"pretty-path":')
-    res = res.replace(":url", '"url":')
     res_object = safe_load(res)
-    artifacts = {
-        artifact["url"]
-        for artifact in res_object
-        if artifact["url"].endswith(
-            (
-                ".tar.gz",
-                ".tar.bz2",
-                "/repodata.json",
-            )
-        )
-    }
+    if res_object['count'] == 0:
+        return artifacts
+
+    for artifact in res_object['value']:
+        zipName = artifact['name']  # LinuxArtifacts or OSXArtifacts
+        zipUrl = artifact['resource']['downloadUrl']
+        log(f"zip name is {zipName} url {zipUrl}")
+        fname = await download_file(session, zipName, zipUrl)
+        if not fname:
+            continue
+        pkgsImages = list_zip_contents(fname)
+        for pkg in pkgsImages:
+            artifacts.append((zipUrl, pkg))
+
     return artifacts
 
 
-# Given a PR and commit sha, fetch a list of the artifacts
-async def fetch_pr_sha_artifacts(session: ClientSession, pr: int, sha: str) -> List[str]:
+def parse_azure_build_id(url: str) -> str:
+    return re.search("buildId=(\d+)", url).group(1)
+
+
+# Given a PR and commit sha, fetch a list of the artifact zip files URLs and their contents
+async def fetch_pr_sha_artifacts(session: ClientSession, pr: int, sha: str) -> List[Tuple[str, str]]:
     url = f"https://api.github.com/repos/bioconda/bioconda-recipes/commits/{sha}/check-runs"
-    artifacts: List[str] = []
 
     headers = {
         "User-Agent": "BiocondaCommentResponder",
@@ -134,15 +149,19 @@ async def fetch_pr_sha_artifacts(session: ClientSession, pr: int, sha: str) -> L
         response.raise_for_status()
         res = await response.text()
     check_runs = safe_load(res)
+    log(f"DEBUG url was {url} returned {check_runs}")
 
     for check_run in check_runs["check_runs"]:
-        if check_run["output"]["title"] == "Workflow: bioconda-test":
-            # The circleci IDs are embedded in a string in output:summary
-            circle_ci_ids = parse_circle_ci_summary(check_run["output"]["summary"])
-            for item in circle_ci_ids:
-                artifact = await fetch_artifacts(session, item)
-                artifacts.extend(artifact)
-    return artifacts
+        # The names are "bioconda.bioconda-recipes (test_osx test_osx)" or similar
+        if check_run["name"].startswith("bioconda.bioconda-recipes (test_"):
+            # The azure build ID is in the details_url as buildId=\d+
+            buildID = parse_azure_build_id(check_run["details_url"])
+            log(f"DEBUG buildID is {buildID}")
+            zipFiles = await fetch_azure_zip_files(session, buildID)
+            log(f"DEBUG zipFiles are {zipFiles}")
+            return zipFiles  # We've already fetched all possible artifacts
+
+    return []
 
 
 async def get_sha_for_status(job_context: Dict[str, Any]) -> Optional[str]:
