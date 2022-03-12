@@ -176,7 +176,10 @@ async def main() -> None:
             elif " hello" in comment:
                 await send_comment(session, issue_number, "Yes?")
             elif " please fetch artifacts" in comment or " please fetch artefacts" in comment:
-                await artifact_checker(session, issue_number)
+                if job_context["actor"] != "dpryan79":
+                    await send_comment(session, issue_number, "Sorry, I'm currently disabled")
+                else:
+                    await artifact_checker(session, issue_number)
             elif " please merge" in comment:
                 await send_comment(session, issue_number, "Sorry, I'm currently disabled")
                 #log("This should have been directly invoked via bioconda-bot-merge")
