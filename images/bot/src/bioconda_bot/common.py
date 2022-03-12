@@ -150,16 +150,13 @@ async def fetch_pr_sha_artifacts(session: ClientSession, pr: int, sha: str) -> L
         response.raise_for_status()
         res = await response.text()
     check_runs = safe_load(res)
-    log(f"DEBUG url was {url} returned {check_runs}")
 
     for check_run in check_runs["check_runs"]:
         # The names are "bioconda.bioconda-recipes (test_osx test_osx)" or similar
         if check_run["name"].startswith("bioconda.bioconda-recipes (test_"):
             # The azure build ID is in the details_url as buildId=\d+
             buildID = parse_azure_build_id(check_run["details_url"])
-            log(f"DEBUG buildID is {buildID}")
             zipFiles = await fetch_azure_zip_files(session, buildID)
-            log(f"DEBUG zipFiles are {zipFiles}")
             return zipFiles  # We've already fetched all possible artifacts
 
     return []

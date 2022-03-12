@@ -57,7 +57,7 @@ async def make_artifact_comment(session: ClientSession, pr: int, sha: str) -> No
 
         # Conda install examples
         comment += "***\n\nYou may also use `conda` to install these after downloading and extracting the appropriate zip file. From the LinuxArtifacts or OSXArtifacts directories:\n\n"
-        comment += "```conda install -c packages <package name>\n```\n"
+        comment += "```\nconda install -c packages <package name>\n```\n"
 
         # Table of containers
         comment += "***\n\nDocker image(s) built (images are in the LinuxArtifacts zip file above):\n\n"
@@ -71,7 +71,7 @@ async def make_artifact_comment(session: ClientSession, pr: int, sha: str) -> No
                     package_name, tag = image_name.split(':', 1)
                     #image_url = URL[:-3]  # trim off zip from format=
                     #image_url += "file&subPath=%2F{}.tar.gz".format("%2F".join(["images", '%3A'.join([package_name, tag])]))
-                    comment += f"[{package_name}] | {tag} | "
+                    comment += f"{package_name} | {tag} | "
                     comment += f'<details><summary>show</summary>`gzip -dc LinuxArtifacts/images/{image_name}.tar.gz \\| docker load`\n'
         comment += "\n\n"
     else:
@@ -176,16 +176,12 @@ async def main() -> None:
             elif " hello" in comment:
                 await send_comment(session, issue_number, "Yes?")
             elif " please fetch artifacts" in comment or " please fetch artefacts" in comment:
-                if job_context["actor"] != "dpryan79":
-                    await send_comment(session, issue_number, "Sorry, I'm currently disabled")
-                else:
-                    await artifact_checker(session, issue_number)
-            elif " please merge" in comment:
-                await send_comment(session, issue_number, "Sorry, I'm currently disabled")
-                #log("This should have been directly invoked via bioconda-bot-merge")
-                #from .merge import request_merge
-
-                #await request_merge(session, issue_number)
+                await artifact_checker(session, issue_number)
+            #elif " please merge" in comment:
+            #    await send_comment(session, issue_number, "Sorry, I'm currently disabled")
+            #    #log("This should have been directly invoked via bioconda-bot-merge")
+            #    #from .merge import request_merge
+            #    #await request_merge(session, issue_number)
             elif " please add label" in comment:
                 await add_pr_label(session, issue_number)
                 await notify_ready(session, issue_number)
