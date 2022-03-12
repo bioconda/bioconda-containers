@@ -7,6 +7,7 @@ from asyncio.subprocess import create_subprocess_exec
 from pathlib import Path
 from shutil import which
 from typing import Any, Dict, List, Optional, Set, Tuple
+from zipfile import ZipFile
 
 from aiohttp import ClientSession
 from yaml import safe_load
