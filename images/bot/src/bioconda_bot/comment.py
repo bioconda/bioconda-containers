@@ -25,69 +25,59 @@ log = logger.info
 # Given a PR and commit sha, post a comment with any artifacts
 async def make_artifact_comment(session: ClientSession, pr: int, sha: str) -> None:
     artifacts = await fetch_pr_sha_artifacts(session, pr, sha)
-    nPackages = sum(1 for artifact in artifacts if artifact.endswith((".tar.bz2", "tar.gz")))
+    nPackages = len(artifacts)
 
     if nPackages > 0:
-        # If a package artifact is found, the accompanying repodata is the preceeding item in artifacts
-        comment = "Artifacts built on CircleCI are ready for inspection:\n\n"
-
-        # Table of packages and repodata.json
-        comment += "<details><summary>Package(s)</summary>\n\n"
-        comment += "Arch | Package | Repodata\n-----|---------|---------\n"
+        comment = "Package(s) built on Azure are ready for inspection:\n\n"
+        comment += "Arch | Package | Zip File\n-----|---------|---------\n"
         install_noarch = ""
         install_linux = ""
         install_osx = ""
 
-        for artifact in artifacts:
-            if not (package_match := re.match(r"^((.+)\/(.+)\/(.+\.tar\.bz2))$", artifact)):
+        # Table of packages and repodata.json
+        for URL, artifact in artifacts:
+            if not (package_match := re.match(r"^((.+)\/(.+)\/(.+)\/(.+\.tar\.bz2))$", artifact)):
                 continue
-            url, basedir, subdir, packageName = package_match.groups()
-            repo_url = "/".join([basedir, subdir, "repodata.json"])
-            conda_install_url = basedir
+            url, archdir, basedir, subdir, packageName = package_match.groups()
+            urlBase = URL[:-3]  # trim off zip from format=
+            urlBase += "file&subPath=%2F{}".format("%2F".join([basedir, subdir]))
+            conda_install_url = urlBase
+            # N.B., the zip file URL is nearly identical to the URL for the individual member files. It's unclear if there's an API for getting the correct URL to the files themselves
+            #pkgUrl = "%2F".join([urlBase, packageName])
+            #repoUrl = "%2F".join([urlBase, "current_repodata.json"])
+            #resp = await session.get(repoUrl)
 
             if subdir == "noarch":
                 comment += "noarch |"
-                install_noarch = (
-                    f"```\nconda install -c {conda_install_url} <package name>\n```\n"
-                )
             elif subdir == "linux-64":
                 comment += "linux-64 |"
-                install_linux = (
-                    f"```\nconda install -c {conda_install_url} <package name>\n```\n"
-                )
             else:
                 comment += "osx-64 |"
-                install_osx = f"```\nconda install -c {conda_install_url} <package name>\n```\n"
-            comment += f" [{packageName}]({url}) | [repodata.json]({repo_url})\n"
+            comment += f" {packageName} | [{archdir}]({URL})\n"
 
         # Conda install examples
-        comment += "***\n\nYou may also use `conda` to install these:\n\n"
-        if install_noarch:
-            comment += f" * For packages on noarch:\n{install_noarch}"
-        if install_linux:
-            comment += f" * For packages on linux-64:\n{install_linux}"
-        if install_osx:
-            comment += f" * For packages on osx-64:\n{install_osx}"
+        comment += "***\n\nYou may also use `conda` to install these after downloading and extracting the appropriate zip file. From the LinuxArtifacts or OSXArtifacts directories:\n\n"
+        comment += "```conda install -c packages <package name>\n```\n"
 
-        comment += "***\n"
-        comment += "</details>\n"
         # Table of containers
-        comment += "<details><summary>Container image(s)</summary>\n\n"
+        comment += "***\n\nDocker image(s) built (images are in the LinuxArtifacts zip file above):\n\n"
         comment += "Package | Tag | Install with `docker`\n"
         comment += "--------|-----|----------------------\n"
 
-        for artifact in artifacts:
+        for URL, artifact in artifacts:
             if artifact.endswith(".tar.gz"):
                 image_name = artifact.split("/").pop()[: -len(".tar.gz")]
-                if "%3A" in image_name:
-                    package_name, tag = image_name.split("%3A", 1)
-                    comment += f"[{package_name}]({artifact}) | {tag} | "
-                    comment += f'<details><summary>show</summary>`curl -L "{artifact}" \\| gzip -dc \\| docker load`</details>\n'
-        comment += "</details>\n"
+                if ':' in image_name:
+                    package_name, tag = image_name.split(':', 1)
+                    #image_url = URL[:-3]  # trim off zip from format=
+                    #image_url += "file&subPath=%2F{}.tar.gz".format("%2F".join(["images", '%3A'.join([package_name, tag])]))
+                    comment += f"[{package_name}] | {tag} | "
+                    comment += f'<details><summary>show</summary>`gzip -dc LinuxArtifacts/images/{image_name}.tar.gz \\| docker load`\n'
+        comment += "\n\n"
     else:
         comment = (
-            "No artifacts found on the most recent CircleCI build. "
-            "Either the build failed or the recipe was blacklisted/skipped."
+            "No artifacts found on the most recent Azure build. "
+            "Either the build failed, the artifacts have were removed due to age, or the recipe was blacklisted/skipped."
         )
     await send_comment(session, pr, comment)
 
@@ -186,12 +176,16 @@ async def main() -> None:
             elif " hello" in comment:
                 await send_comment(session, issue_number, "Yes?")
             elif " please fetch artifacts" in comment or " please fetch artefacts" in comment:
-                await artifact_checker(session, issue_number)
+                if job_context["actor"] != "dpryan79":
+                    await send_comment(session, issue_number, "Sorry, I'm currently disabled")
+                else:
+                    await artifact_checker(session, issue_number)
             elif " please merge" in comment:
-                log("This should have been directly invoked via bioconda-bot-merge")
-                from .merge import request_merge
+                await send_comment(session, issue_number, "Sorry, I'm currently disabled")
+                #log("This should have been directly invoked via bioconda-bot-merge")
+                #from .merge import request_merge
 
-                await request_merge(session, issue_number)
+                #await request_merge(session, issue_number)
             elif " please add label" in comment:
                 await add_pr_label(session, issue_number)
                 await notify_ready(session, issue_number)
