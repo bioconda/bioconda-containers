@@ -295,5 +295,6 @@ async def main() -> None:
     comment = original_comment.lower()
     if comment.startswith(("@bioconda-bot", "@biocondabot")):
         if " please merge" in comment:
-            async with ClientSession() as session:
-                await request_merge(session, issue_number)
+            await send_comment(session, issue_number, "Sorry, I'm currently disabled")
+            #async with ClientSession() as session:
+            #    await request_merge(session, issue_number)
