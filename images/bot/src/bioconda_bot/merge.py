@@ -8,6 +8,7 @@ from enum import Enum, auto
 from pathlib import Path
 from shutil import which
 from typing import Any, Dict, List, Optional, Set, Tuple
+from zipfile import ZipFile
 
 from aiohttp import ClientSession
 from yaml import safe_load
@@ -103,11 +104,8 @@ async def check_is_mergeable(
     return MergeState.MERGEABLE
 
 
-def parse_circle_ci_summary(summary: str) -> List[str]:
-    return re.findall(r"gh/bioconda/bioconda-recipes/(\d+)", summary)
-
-
 # Ensure uploaded containers are in repos that have public visibility
+# TODO: This should ping @bioconda/core if it fails
 async def toggle_visibility(session: ClientSession, container_repo: str) -> None:
     url = f"https://quay.io/api/v1/repository/biocontainers/{container_repo}/changevisibility"
     QUAY_OAUTH_TOKEN = os.environ["QUAY_OAUTH_TOKEN"]
@@ -126,69 +124,141 @@ async def toggle_visibility(session: ClientSession, container_repo: str) -> None
     log("Trying to toggle visibility (%s) returned %d", url, rc)
 
 
-# Download an artifact from CircleCI, rename and upload it
-async def download_and_upload(session: ClientSession, x: str) -> None:
-    basename = x.split("/").pop()
-    # the tarball needs a regular name without :, the container needs pkg:tag
-    image_name = basename.replace("%3A", ":").replace("\n", "").replace(".tar.gz", "")
-    file_name = basename.replace("%3A", "_").replace("\n", "")
+## Download an artifact from CircleCI, rename and upload it
+#async def download_and_upload(session: ClientSession, x: str) -> None:
+#    basename = x.split("/").pop()
+#    # the tarball needs a regular name without :, the container needs pkg:tag
+#    image_name = basename.replace("%3A", ":").replace("\n", "").replace(".tar.gz", "")
+#    file_name = basename.replace("%3A", "_").replace("\n", "")
+#
+#    async with session.get(x) as response:
+#        with open(file_name, "wb") as file:
+#            logged = 0
+#            loaded = 0
+#            while chunk := await response.content.read(256 * 1024):
+#                file.write(chunk)
+#                loaded += len(chunk)
+#                if loaded - logged >= 50 * 1024 ** 2:
+#                    log("Downloaded %.0f MiB: %s", max(1, loaded / 1024 ** 2), x)
+#                    logged = loaded
+#            log("Downloaded %.0f MiB: %s", max(1, loaded / 1024 ** 2), x)
+#
+#    if x.endswith(".gz"):
+#        # Container
+#        log("uploading with skopeo: %s", file_name)
+#        # This can fail, retry with 5 second delays
+#        count = 0
+#        maxTries = 5
+#        success = False
+#        QUAY_LOGIN = os.environ["QUAY_LOGIN"]
+#        env = os.environ.copy()
+#        # TODO: Fix skopeo package to find certificates on its own.
+#        skopeo_path = which("skopeo")
+#        if not skopeo_path:
+#            raise RuntimeError("skopeo not found")
+#        env["SSL_CERT_DIR"] = str(Path(skopeo_path).parents[1].joinpath("ssl"))
+#        while count < maxTries:
+#            try:
+#                await async_exec(
+#                    "skopeo",
+#                    "--command-timeout",
+#                    "600s",
+#                    "copy",
+#                    f"docker-archive:{file_name}",
+#                    f"docker://quay.io/biocontainers/{image_name}",
+#                    "--dest-creds",
+#                    QUAY_LOGIN,
+#                    env=env,
+#                )
+#                success = True
+#                break
+#            except:
+#                count += 1
+#                if count == maxTries:
+#                    raise
+#            await sleep(5)
+#        if success:
+#            await toggle_visibility(session, basename.split("%3A")[0])
+#    elif x.endswith(".bz2"):
+#        # Package
+#        log("uploading package")
+#        ANACONDA_TOKEN = os.environ["ANACONDA_TOKEN"]
+#        await async_exec("anaconda", "-t", ANACONDA_TOKEN, "upload", file_name, "--force")
+#
+#    log("cleaning up")
+#    os.remove(file_name)
 
-    async with session.get(x) as response:
-        with open(file_name, "wb") as file:
-            logged = 0
-            loaded = 0
-            while chunk := await response.content.read(256 * 1024):
-                file.write(chunk)
-                loaded += len(chunk)
-                if loaded - logged >= 50 * 1024 ** 2:
-                    log("Downloaded %.0f MiB: %s", max(1, loaded / 1024 ** 2), x)
-                    logged = loaded
-            log("Downloaded %.0f MiB: %s", max(1, loaded / 1024 ** 2), x)
 
-    if x.endswith(".gz"):
-        # Container
-        log("uploading with skopeo: %s", file_name)
-        # This can fail, retry with 5 second delays
-        count = 0
-        maxTries = 5
-        success = False
-        QUAY_LOGIN = os.environ["QUAY_LOGIN"]
-        env = os.environ.copy()
-        # TODO: Fix skopeo package to find certificates on its own.
-        skopeo_path = which("skopeo")
-        if not skopeo_path:
-            raise RuntimeError("skopeo not found")
-        env["SSL_CERT_DIR"] = str(Path(skopeo_path).parents[1].joinpath("ssl"))
-        while count < maxTries:
-            try:
-                await async_exec(
-                    "skopeo",
-                    "--command-timeout",
-                    "600s",
-                    "copy",
-                    f"docker-archive:{file_name}",
-                    f"docker://quay.io/biocontainers/{image_name}",
-                    "--dest-creds",
-                    QUAY_LOGIN,
-                    env=env,
-                )
-                success = True
-                break
-            except:
-                count += 1
-                if count == maxTries:
-                    raise
-            await sleep(5)
-        if success:
-            await toggle_visibility(session, basename.split("%3A")[0])
-    elif x.endswith(".bz2"):
-        # Package
-        log("uploading package")
-        ANACONDA_TOKEN = os.environ["ANACONDA_TOKEN"]
-        await async_exec("anaconda", "-t", ANACONDA_TOKEN, "upload", file_name, "--force")
+async def upload_package(session: ClientSession, zf: ZipFile, e: ZipInfo):
+    log(f"extracting {e.filename}")
+    fName = zf.extract(e)
+
+    log(f"uploading {fName}")
+    ANACONDA_TOKEN = os.environ["ANACONDA_TOKEN"]
+    await async_exec("anaconda", "-t", ANACONDA_TOKEN, "upload", fName, "--force")
 
     log("cleaning up")
-    os.remove(file_name)
+    os.remove(fName)
+
+
+async def upload_image(session: ClientSession, zf: ZipFile, e: ZipInfo):
+    basename = e.filename.split("/").pop()
+    # the tarball needs a regular name without :, the container needs pkg:tag
+    image_name = basename.replace("%3A", ":").replace("\n", "").replace(".tar.gz", "")
+
+    log(f"extracting {e.filename}")
+    fName = zf.extract(e)
+
+    log(f"uploading with skopeo: {fName}")
+    # This can fail, retry with 5 second delays
+    count = 0
+    maxTries = 5
+    success = False
+    QUAY_LOGIN = os.environ["QUAY_LOGIN"]
+    env = os.environ.copy()
+    # TODO: Fix skopeo package to find certificates on its own.
+    skopeo_path = which("skopeo")
+    if not skopeo_path:
+        raise RuntimeError("skopeo not found")
+    env["SSL_CERT_DIR"] = str(Path(skopeo_path).parents[1].joinpath("ssl"))
+    while count < maxTries:
+        try:
+            await async_exec(
+                "skopeo",
+                "--command-timeout",
+                "600s",
+                "copy",
+                f"docker-archive:{fName}",
+                f"docker://quay.io/biocontainers/{image_name}",
+                "--dest-creds",
+                QUAY_LOGIN,
+                env=env,
+            )
+            success = True
+            break
+        except:
+            count += 1
+            if count == maxTries:
+                raise
+        await sleep(5)
+    if success:
+        await toggle_visibility(session, basename.split("%3A")[0])
+
+    log("cleaning up")
+    os.remove(fName)
+
+
+# Given an already downloaded zip file name in the current working directory, upload the contents
+async def extract_and_upload(session: ClientSession, fName: str) -> int:
+    if os.path.exists(fName):
+        zf = ZipFile(fname)
+        for e in zf.infolist():
+            if e.filename.endswith('.tar.gz'):
+                await upload_package(session, zf, e)
+            elif e.filename.endswith('.tar.bz2')
+                await upload_image(session, zf, e)
+        return 0
+    return 1
 
 
 # Upload artifacts to quay.io and anaconda, return the commit sha
@@ -198,14 +268,14 @@ async def upload_artifacts(session: ClientSession, pr: int) -> str:
     pr_info = await get_pr_info(session, pr)
     sha: str = pr_info["head"]["sha"]
 
-    # Fetch the artifacts
+    # Fetch the artifacts (a list of (URL, artifact) tuples actually)
     artifacts = await fetch_pr_sha_artifacts(session, pr, sha)
-    artifacts = [artifact for artifact in artifacts if artifact.endswith((".gz", ".bz2"))]
+    artifacts = [artifact for (URL, artifact) in artifacts if artifact.endswith((".gz", ".bz2"))]
     assert artifacts
 
     # Download/upload Artifacts
-    for artifact in artifacts:
-        await download_and_upload(session, artifact)
+    for zipFileName in ["LinuxArtifacts.zip", "OSXArtifacts.zip"]:
+        await extract_and_upload(session, zipFileName)
 
     return sha
 
@@ -295,6 +365,8 @@ async def main() -> None:
     comment = original_comment.lower()
     if comment.startswith(("@bioconda-bot", "@biocondabot")):
         if " please merge" in comment:
-            await send_comment(session, issue_number, "Sorry, I'm currently disabled")
-            #async with ClientSession() as session:
-            #    await request_merge(session, issue_number)
+            if job_context["actor"] != "dpryan79":
+                await send_comment(session, issue_number, "Sorry, I'm currently disabled")
+            else:
+                async with ClientSession() as session:
+                    await request_merge(session, issue_number)
