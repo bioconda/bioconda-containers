@@ -203,13 +203,15 @@ async def upload_package(session: ClientSession, zf: ZipFile, e: ZipInfo):
 
 async def upload_image(session: ClientSession, zf: ZipFile, e: ZipInfo):
     basename = e.filename.split("/").pop()
-    # the tarball needs a regular name without :, the container needs pkg:tag
-    image_name = basename.replace("%3A", ":").replace("\n", "").replace(".tar.gz", "")
+    image_name = basename.replace("\n", "").replace(".tar.gz", "")
 
     log(f"extracting {e.filename}")
     fName = zf.extract(e)
+    # Skopeo can't handle a : in the file name, so we need to remove it
+    newFName = fName.replace(":", "")
+    os.rename(fName, newFName)
 
-    log(f"uploading with skopeo: {fName}")
+    log(f"uploading with skopeo: {newFName} {image_name}")
     # This can fail, retry with 5 second delays
     count = 0
     maxTries = 5
@@ -228,7 +230,7 @@ async def upload_image(session: ClientSession, zf: ZipFile, e: ZipInfo):
                 "--command-timeout",
                 "600s",
                 "copy",
-                f"docker-archive:{fName}",
+                f"docker-archive:'{newFName}'",
                 f"docker://quay.io/biocontainers/{image_name}",
                 "--dest-creds",
                 QUAY_LOGIN,
