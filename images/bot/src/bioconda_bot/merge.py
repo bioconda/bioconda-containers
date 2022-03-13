@@ -251,7 +251,7 @@ async def upload_image(session: ClientSession, zf: ZipFile, e: ZipInfo):
 # Given an already downloaded zip file name in the current working directory, upload the contents
 async def extract_and_upload(session: ClientSession, fName: str) -> int:
     if os.path.exists(fName):
-        zf = ZipFile(fname)
+        zf = ZipFile(fName)
         for e in zf.infolist():
             if e.filename.endswith('.tar.gz'):
                 await upload_package(session, zf, e)
