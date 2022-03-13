@@ -247,7 +247,7 @@ async def upload_image(session: ClientSession, zf: ZipFile, e: ZipInfo):
         await toggle_visibility(session, basename.split("%3A")[0])
 
     log("cleaning up")
-    os.remove(fName)
+    os.remove(newFName)
 
 
 # Given an already downloaded zip file name in the current working directory, upload the contents
@@ -367,8 +367,5 @@ async def main() -> None:
     comment = original_comment.lower()
     if comment.startswith(("@bioconda-bot", "@biocondabot")):
         if " please merge" in comment:
-            if job_context["actor"] != "dpryan79":
-                await send_comment(session, issue_number, "Sorry, I'm currently disabled")
-            else:
-                async with ClientSession() as session:
-                    await request_merge(session, issue_number)
+            async with ClientSession() as session:
+                await request_merge(session, issue_number)
