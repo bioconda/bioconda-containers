@@ -8,7 +8,7 @@ from enum import Enum, auto
 from pathlib import Path
 from shutil import which
 from typing import Any, Dict, List, Optional, Set, Tuple
-from zipfile import ZipFile
+from zipfile import ZipFile, ZipInfo
 
 from aiohttp import ClientSession
 from yaml import safe_load
@@ -255,7 +255,7 @@ async def extract_and_upload(session: ClientSession, fName: str) -> int:
         for e in zf.infolist():
             if e.filename.endswith('.tar.gz'):
                 await upload_package(session, zf, e)
-            elif e.filename.endswith('.tar.bz2')
+            elif e.filename.endswith('.tar.bz2'):
                 await upload_image(session, zf, e)
         return 0
     return 1
