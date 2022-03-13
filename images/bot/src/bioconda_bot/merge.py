@@ -230,7 +230,7 @@ async def upload_image(session: ClientSession, zf: ZipFile, e: ZipInfo):
                 "--command-timeout",
                 "600s",
                 "copy",
-                f"docker-archive:'{newFName}'",
+                f"docker-archive:{newFName}",
                 f"docker://quay.io/biocontainers/{image_name}",
                 "--dest-creds",
                 QUAY_LOGIN,
