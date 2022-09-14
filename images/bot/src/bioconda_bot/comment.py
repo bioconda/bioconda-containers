@@ -57,7 +57,7 @@ async def make_artifact_comment(session: ClientSession, pr: int, sha: str) -> No
 
         # Conda install examples
         comment += "***\n\nYou may also use `conda` to install these after downloading and extracting the appropriate zip file. From the LinuxArtifacts or OSXArtifacts directories:\n\n"
-        comment += "```\nconda install -c packages <package name>\n```\n"
+        comment += "```\nconda install -c ./packages <package name>\n```\n"
 
         # Table of containers
         comment += "***\n\nDocker image(s) built (images are in the LinuxArtifacts zip file above):\n\n"
