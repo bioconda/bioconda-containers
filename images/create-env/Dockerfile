@@ -1,12 +1,21 @@
+# Use the exact conda, mamba versions as used in bioconda-recipes' builds.
+ARG bioconda_utils_version='1.1.3'
+FROM quay.io/bioconda/bioconda-utils-build-env-cos7:${bioconda_utils_version} as bioconda-build-env
+RUN /opt/conda/bin/conda list \
+      --export '^(conda|mamba)$' \
+      | sed -n 's/=[^=]*$//p' \
+      > /tmp/requirements.txt
+
+
 # Use Debian instead of BusyBox base since Miniconda currently needs external zlib.
 FROM quay.io/bioconda/base-glibc-debian-bash as build
 
 WORKDIR /tmp/work
+COPY --from=bioconda-build-env /tmp/requirements.txt ./
 COPY install-conda print-env-activate create-env ./
 ADD https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh ./miniconda.sh
 
-ARG version='4.9.2'
-RUN ./install-conda "${version}" /opt/create-env
+RUN ./install-conda ./requirements.txt /opt/create-env
 
 
 FROM quay.io/bioconda/base-glibc-busybox-bash

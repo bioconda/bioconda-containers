@@ -1,6 +1,13 @@
 # Changelog
 
 
+## bioconda/create-env 2.2.0 (2022-10-14)
+
+### Changed
+
+- Use the exact conda, mamba versions as used in bioconda-recipes' builds.
+
+
 ## bioconda/create-env 2.1.0 (2021-04-14)
 
 ### Changed
