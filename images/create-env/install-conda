@@ -1,6 +1,6 @@
 #! /bin/bash -eu
 
-version="${1}"
+requirements_file="${1}"
 conda_install_prefix="${2}"
 
 # Install a bootstrap Miniconda installation.
@@ -14,13 +14,9 @@ miniconda_boostrap_prefix="$( pwd )/miniconda"
   # Install the base Conda installation.
   . "${miniconda_boostrap_prefix}/etc/profile.d/conda.sh"
 
-  # Install conda and some additional tools:
-  #  - python: pinned to 3.8 to avoid hitting
-  #    - https://github.com/conda/conda/issues/10490
-  #    - https://bugs.python.org/issue43517
+  # Install conda, mamba and some additional tools:
   #  - tini: init program,
   #  - binutils, findutils: tools to strip down image/environment size,
-  #  - mamba: alternative Conda package manager.
 
   # Only need `strip` executable from binutils. Other binaries from the package
   # and especially the "sysroot" dependency is only bloat for this container
@@ -39,16 +35,12 @@ miniconda_boostrap_prefix="$( pwd )/miniconda"
     --prefix="${conda_install_prefix}" \
     --channel=conda-forge \
     \
-    conda="${version}" \
-    \
-    python=3.8 \
+    --file="${requirements_file}" \
     \
     tini \
     \
     libgcc-ng \
     findutils \
-    \
-    mamba \
     ;
 
   mv \
@@ -109,3 +101,8 @@ conda config \
 conda list --name=base
 conda info --all
 mamba --version
+# Make sure we have the requested conda, mamba versions installed.
+conda list \
+  --export '^(conda|mamba)$' \
+  | sed -n 's/=[^=]*$//p' \
+  | diff "${requirements_file}" -

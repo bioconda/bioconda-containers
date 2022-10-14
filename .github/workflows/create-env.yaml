@@ -14,14 +14,21 @@ on:
 jobs:
   build:
     name: Build & Push
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     env:
-      IMAGE_VERSION: '2.1.0'
-      VERSION: '4.9.2'
+      IMAGE_VERSION: '2.2.0'
       IMAGE_NAME: create-env
 
     steps:
     - uses: actions/checkout@v2
+
+    - name: Prepare
+      id: prepare
+      run: |
+        curl -sSL \
+          'https://raw.githubusercontent.com/bioconda/bioconda-common/master/common.sh' \
+          | sed -n \
+            's/BIOCONDA_UTILS_TAG=v/::set-output name=bioconda_utils_version::/p'
 
     - name: Build
       id: buildah-build
@@ -31,12 +38,11 @@ jobs:
         tags: >-
           latest
           ${{ env.IMAGE_VERSION }}
-          ${{ env.IMAGE_VERSION }}-${{ env.VERSION }}
         context: ./images/${{ env.IMAGE_NAME }}
         dockerfiles: |
           ./images/${{ env.IMAGE_NAME }}/Dockerfile
         build-args: |
-          version=${{ env.VERSION }}
+          bioconda_utils_version=${{ steps.prepare.outputs.bioconda_utils_version }}
 
     - name: Test
       run: |
@@ -60,30 +66,35 @@ jobs:
       run: |
         # FIX upstream: Quay.io does not support immutable images currently.
         #               => Try to use the REST API to check for duplicate tags.
-        respone="$(
-          curl -sL \
-            'https://quay.io/api/v1/repository/bioconda/${{ steps.buildah-build.outputs.image }}/image'
-          )"
-
-        existing_tags="$(
-          printf %s "${respone}" \
-            | jq -r '.images[].tags[]'
-          )" \
-          || {
-            printf %s\\n \
-              'Could not get list of image tags.' \
-              'Does the repository exist on Quay.io?' \
-              'Quay.io REST API response was:' \
-              "${respone}"
-            exit 1
-          }
-        for tag in ${{ steps.buildah-build.outputs.tags }} ; do
-          if [ \! "${tag}" = latest ] ; then
-            if printf %s "${existing_tags}" | grep -qxF "${tag}" ; then
-              printf 'Tag %s already exists!\n' "${tag}"
+        page=0
+        has_additional='true'
+        while [ "${has_additional}" = 'true' ] ; do
+          page="$(( page + 1 ))"
+          respone="$(
+            curl -sL \
+              'https://quay.io/api/v1/repository/bioconda/${{ steps.buildah-build.outputs.image }}/tag?limit=100&page='"${page}"
+            )"
+          has_additional="$( printf %s "${respone}" | jq -r '.has_additional' )"
+          existing_tags="$(
+            printf %s "${respone}" \
+              | jq -r '.tags[]|.name'
+            )" \
+            || {
+              >&2 printf %s\\n \
+                'Could not get list of image tags.' \
+                'Does the repository exist on Quay.io?' \
+                'Quay.io REST API response was:' \
+                "${respone}"
               exit 1
+            }
+          for tag in ${{ steps.buildah-build.outputs.tags }} ; do
+            if [ \! "${tag}" = latest ] ; then
+              if printf %s "${existing_tags}" | grep -qxF "${tag}" ; then
+                >&2 printf 'Tag %s already exists!\n' "${tag}"
+                exit 1
+              fi
             fi
-          fi
+          done
         done
 
     - if: ${{ github.ref == 'refs/heads/main' }}
