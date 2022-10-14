@@ -1,5 +1,31 @@
 ARG base
 
+FROM "${base}"
+RUN CONDA_PKGS_DIRS="/tmp/pkgs" \
+      /opt/create-env/env-execute \
+        create-env \
+          --conda=mamba \
+          /usr/local \
+          file findutils
+RUN . /usr/local/env-activate.sh && \
+    if find /opt/create-env \
+      -type f \
+      -exec file {} \+ \
+      2> /dev/null \
+      | grep 'not stripped' \
+    ; then \
+      >&2 printf 'found unstripped binaries\n' ; exit 1 \
+    ; fi
+RUN . /usr/local/env-activate.sh && \
+    if find /opt/create-env \
+      -type f \
+      -name \*.a \
+      2> /dev/null \
+      | grep . \
+    ; then \
+      >&2 printf 'found static libraries\n' ; exit 1 \
+    ; fi
+
 
 FROM "${base}" as build_bioconda_utils
 RUN /opt/create-env/env-execute \

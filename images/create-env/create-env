@@ -156,11 +156,18 @@ if [ -n "${strip_files_globs}" ] ; then
         | tr '\n' ' '
     )"
     # Strip binaries. (Run strip on all files; ignore errors for non-ELF files.)
+    # Limit open fds (ulimit -n) for strip (small number chosen arbitrarily).
+    # (To avoid "could not create temporary file to hold stripped copy: Too many open files")
     find "${prefix}" \
       -type f \
       \( "${@}" \) \
-      -exec strip {} \+ \
-      2> /dev/null \
+      -print0 \
+      | xargs \
+          --null \
+          -n 64 \
+          strip -- \
+        2>&1 \
+      | grep -v ': file format not recognized' \
       || true
   )
 fi
