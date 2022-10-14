@@ -16,7 +16,7 @@ jobs:
     name: Build & Push
     runs-on: ubuntu-20.04
     env:
-      IMAGE_VERSION: '2.2.0'
+      IMAGE_VERSION: '2.2.1'
       IMAGE_NAME: create-env
 
     steps:

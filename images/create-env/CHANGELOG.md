@@ -1,6 +1,15 @@
 # Changelog
 
 
+## bioconda/create-env 2.2.1 (2022-10-14)
+
+### Changed
+
+- Limit open fd (ulimit -n) for strip (small number chosen arbitrarily).
+
+  The container image itself had unstripped binaries in 2.2.0.
+
+
 ## bioconda/create-env 2.2.0 (2022-10-14)
 
 ### Changed
