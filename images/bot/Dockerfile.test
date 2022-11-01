@@ -6,3 +6,4 @@ RUN . /usr/local/env-activate.sh && \
     bioconda-bot comment --help && \
     bioconda-bot merge --help && \
     bioconda-bot update --help
+    bioconda-bot change --help
