@@ -41,9 +41,9 @@ def build_parser_automerge(parser: ArgumentParser) -> None:
     parser.set_defaults(run_command=run_command)
 
 
-def build_parser_changevisibility(parser: ArgumentParser) -> None:
+def build_parser_changeVisibility(parser: ArgumentParser) -> None:
     def run_command() -> None:
-        from .changevisibility import main as main_
+        from .changeVisibility import main as main_
 
         run(main_())
 
@@ -64,7 +64,7 @@ def get_argument_parser() -> ArgumentParser:
         ("merge", build_parser_merge),
         ("update", build_parser_update),
         ("automerge", build_parser_automerge),
-        ("change", build_parser_changevisibility),
+        ("change", build_parser_changeVisibility),
     ):
         sub_parser = sub_parsers.add_parser(
             command_name,
