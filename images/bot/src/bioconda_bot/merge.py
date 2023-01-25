@@ -244,7 +244,7 @@ async def upload_image(session: ClientSession, zf: ZipFile, e: ZipInfo):
                 raise
         await sleep(5)
     if success:
-        await toggle_visibility(session, basename.split("%3A")[0])
+        await toggle_visibility(session, basename.split(":")[0] if ":" in basename else basename.split("%3A")[0])
 
     log("cleaning up")
     os.remove(newFName)
