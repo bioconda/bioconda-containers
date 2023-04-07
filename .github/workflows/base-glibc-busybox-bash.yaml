@@ -14,7 +14,7 @@ on:
 jobs:
   build:
     name: Build & Push
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     env:
       # The base image is not intended to change often and should be used with
       # version tags or checksum IDs, but not via "latest".
@@ -24,7 +24,7 @@ jobs:
       DEBIAN_VERSION: '10.9'
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     - name: Build
       id: buildah-build
