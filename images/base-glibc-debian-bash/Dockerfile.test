@@ -28,8 +28,10 @@ RUN apt-get update -qq \
       ca-certificates \
       wget \
     && \
-    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
+    ARCH=$(uname -m) \
     && \
-    sh ./Miniconda3-latest-Linux-x86_64.sh -bp /opt/conda \
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-${ARCH}.sh \
+    && \
+    sh ./Miniconda3-latest-Linux-${ARCH}.sh -bp /opt/conda \
     && \
     /opt/conda/bin/conda info --all

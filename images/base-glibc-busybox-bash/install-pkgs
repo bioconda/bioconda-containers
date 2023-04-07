@@ -1,6 +1,7 @@
 #! /bin/sh
 set -xeu
 
+ARCH=$(uname -m)
 
 prepare_remove_docs() {
   # remove lintian and docs (apart from copyright)
@@ -41,7 +42,7 @@ prepare() {
       # Update gconv-modules accordingly.
       # NOTE: When adding/removing any, check required dyn. linked libs!
 
-      local gconv_path='./usr/lib/x86_64-linux-gnu/gconv'
+      local gconv_path="./usr/lib/${ARCH}-linux-gnu/gconv"
       local gconv_modules_regex='UTF-\w+|UNICODE|ISO8859-(1|2|15)|CP125(0|1|2)|MACINTOSH'
       local gconv_modules_file_tmp='./.tmp.gconv-modules'
 
@@ -65,7 +66,7 @@ prepare() {
     bash )
       rm -rf ./usr/share/locale
       # Add custom rpath for libtinfo (see below) to bash binaries.
-      local new_rpath='/lib/x86_64-linux-gnu/terminfo:/usr/lib/x86_64-linux-gnu/terminfo'
+      local new_rpath="/lib/${ARCH}-linux-gnu/terminfo:/usr/lib/${ARCH}-linux-gnu/terminfo"
       add_rpath ./bin/bash "${new_rpath}"
       add_rpath ./usr/bin/clear_console "${new_rpath}"
       ;;
@@ -73,20 +74,20 @@ prepare() {
     libtinfo6 )
       # Move libtinfo libraries to a custom path to ensure it is not
       # unintentionally used in downstream images.
-      find ./usr/lib/x86_64-linux-gnu -type f \
+      find ./usr/lib/${ARCH}-linux-gnu -type f \
         | {
           while read binary ; do
-            add_rpath "${binary}" '/lib/x86_64-linux-gnu/terminfo'
+            add_rpath "${binary}" "/lib/${ARCH}-linux-gnu/terminfo"
           done
         }
 
-      mv ./lib/x86_64-linux-gnu ./temp
-      mkdir ./lib/x86_64-linux-gnu
-      mv ./temp ./lib/x86_64-linux-gnu/terminfo
+      mv ./lib/${ARCH}-linux-gnu ./temp
+      mkdir ./lib/${ARCH}-linux-gnu
+      mv ./temp ./lib/${ARCH}-linux-gnu/terminfo
 
-      mv ./usr/lib/x86_64-linux-gnu ./temp
-      mkdir ./usr/lib/x86_64-linux-gnu
-      mv ./temp ./usr/lib/x86_64-linux-gnu/terminfo
+      mv ./usr/lib/${ARCH}-linux-gnu ./temp
+      mkdir ./usr/lib/${ARCH}-linux-gnu
+      mv ./temp ./usr/lib/${ARCH}-linux-gnu/terminfo
       ;;
     libc-bin | \
     libgcc1 | \
