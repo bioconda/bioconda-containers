@@ -18,7 +18,7 @@ jobs:
     env:
       # The base image is not intended to change often and should be used with
       # version tags or checksum IDs, but not via "latest".
-      IMAGE_VERSION: '2.1.0'
+      IMAGE_VERSION: '3.0.0'
       IMAGE_NAME: base-glibc-busybox-bash
       BUSYBOX_VERSION: '1.32.1'
       DEBIAN_VERSION: '10.9'
@@ -26,8 +26,13 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Build
-      id: buildah-build
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+      with:
+        platforms: arm64
+
+    - name: Calculate tags and labels
+      id: calculate
       run: |
         set -xeu
         cd 'images/${{ env.IMAGE_NAME }}'
@@ -49,11 +54,12 @@ jobs:
         bash="$( run bash --version | sed '1!d' )"
         buildah rm "${container}"
 
-        container="$( buildah from "${image_id}" )"
-        buildah config --label=glibc="${glibc}" "${container}"
-        buildah config --label=busybox="${busybox}" "${container}"
-        buildah config --label=deb-list="${deb_list}" "${container}"
-        buildah config --label=pkg-list="${pkg_list}" "${container}"
+        labels="
+          glibc="${glibc}"
+          busybox="${busybox}"
+          deb-list="${deb_list}"
+          pkg-list="${pkg_list}"
+        "
 
         glibc_version="$( printf %s "${glibc}" | sed -E 's/.*version ([0-9.]*[0-9]).*/\1/' )"
         busybox_version="$( printf %s "${busybox}" | sed -E '1 s/.*v([0-9.]*[0-9]).*/\1/' )"
@@ -64,23 +70,29 @@ jobs:
           latest
         "
 
-        image_id="$( buildah commit "${container}" )"
-        buildah rm "${container}"
-        image_name='${{ env.IMAGE_NAME }}'
+        echo "tags=$( echo ${tags} )" >> $GITHUB_OUTPUT
+        echo "labels=$( echo ${labels} )" >> $GITHUB_OUTPUT
 
-        for tag in ${tags} ; do
-          buildah tag "${image_id}" \
-            "${image_name}":"${tag}"
-        done
-
-        echo "::set-output name=image::${image_name}"
-        echo "::set-output name=tags::$( echo ${tags} )"
+    - name: Build multiarch image
+      id: build
+      uses: redhat-actions/buildah-build@v2
+      with:
+        image: ${{ env.IMAGE_NAME }}
+        tags: ${{ steps.calculate.outputs.tags }}
+        labels: ${{ steps.calculate.outputs.labels }}
+        archs: amd64,arm64
+        build-args: |
+          busybox_version=${{ env.BUSYBOX_VERSION }}
+          debian_version=${{ env.DEBIAN_VERSION }}
+        context: ./images/${{ env.IMAGE_NAME }}
+        containerfiles: |
+          ./images/${{ env.IMAGE_NAME }}/Dockerfile
 
     - name: Test
       run: |
-        image='${{ steps.buildah-build.outputs.image }}'
+        image='${{ env.IMAGE_NAME }}'
         ids="$(
-          for tag in ${{ steps.buildah-build.outputs.tags }} ; do
+          for tag in ${{ steps.calculate.outputs.tags }} ; do
             buildah images --quiet --no-trunc "${image}:${tag}"
           done
           )"
@@ -99,8 +111,8 @@ jobs:
         # FIX upstream: Quay.io does not support immutable images currently.
         #               => Try to use the REST API to check for duplicate tags.
         respone="$(
-          curl -sL \
-            'https://quay.io/api/v1/repository/bioconda/${{ steps.buildah-build.outputs.image }}/image'
+          curl -sL -H "Authorization: Bearer ${{ secrets.QUAY_BIOCONDA_TOKEN }}" \
+            'https://quay.io/api/v1/repository/bioconda/${{ steps.build.outputs.image }}/image'
           )"
 
         existing_tags="$(
@@ -115,7 +127,7 @@ jobs:
               "${respone}"
             exit 1
           }
-        for tag in ${{ steps.buildah-build.outputs.tags }} ; do
+        for tag in ${{ steps.calculate.outputs.tags }} ; do
           if [ \! "${tag}" = latest ] ; then
             if printf %s "${existing_tags}" | grep -qxF "${tag}" ; then
               printf 'Tag %s already exists!\n' "${tag}"
@@ -128,8 +140,8 @@ jobs:
       name: Push
       uses: redhat-actions/push-to-registry@v2
       with:
-        image: ${{ steps.buildah-build.outputs.image }}
-        tags: ${{ steps.buildah-build.outputs.tags }}
+        image: ${{ steps.build.outputs.image }}
+        tags: ${{ steps.calculate.outputs.tags }}
         registry: ${{ secrets.QUAY_BIOCONDA_REPO }}
         username: ${{ secrets.QUAY_BIOCONDA_USERNAME }}
         password: ${{ secrets.QUAY_BIOCONDA_TOKEN }}
@@ -137,9 +149,9 @@ jobs:
     - if: ${{ github.ref == 'refs/heads/main' }}
       name: Test Pushed
       run: |
-        image='${{ steps.buildah-build.outputs.image }}'
+        image='${{ env.IMAGE_NAME }}'
         ids="$(
-          for tag in ${{ steps.buildah-build.outputs.tags }} ; do
+          for tag in ${{ steps.calculate.outputs.tags }} ; do
             buildah images --quiet --no-trunc "${image}:${tag}"
           done
           )"
