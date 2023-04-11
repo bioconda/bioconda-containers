@@ -77,7 +77,7 @@ jobs:
         while [ "${has_additional}" = 'true' ] ; do
           page="$(( page + 1 ))"
           respone="$(
-            curl -sL \
+            curl -sL -H "Authorization: Bearer ${{ secrets.QUAY_BIOCONDA_TOKEN }}" \
               'https://quay.io/api/v1/repository/bioconda/${{ steps.buildah-build.outputs.image }}/tag?limit=100&page='"${page}"
             )"
           has_additional="$( printf %s "${respone}" | jq -r '.has_additional' )"

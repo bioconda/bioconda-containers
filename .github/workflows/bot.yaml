@@ -68,7 +68,7 @@ jobs:
     #    # FIX upstream: Quay.io does not support immutable images currently.
     #    #               => Try to use the REST API to check for duplicate tags.
     #    respone="$(
-    #      curl -sL \
+    #      curl -sL -H "Authorization: Bearer ${{ secrets.QUAY_BIOCONDA_TOKEN }}" \
     #        'https://quay.io/api/v1/repository/bioconda/${{ steps.buildah-build.outputs.image }}/image'
     #      )"
 
