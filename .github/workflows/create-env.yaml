@@ -22,6 +22,11 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+      with:
+        platforms: arm64
+
     - name: Prepare
       id: prepare
       run: |
@@ -38,8 +43,9 @@ jobs:
         tags: >-
           latest
           ${{ env.IMAGE_VERSION }}
+        archs: amd64,arm64
         context: ./images/${{ env.IMAGE_NAME }}
-        dockerfiles: |
+        containerfiles: |
           ./images/${{ env.IMAGE_NAME }}/Dockerfile
         build-args: |
           bioconda_utils_version=${{ steps.prepare.outputs.bioconda_utils_version }}
