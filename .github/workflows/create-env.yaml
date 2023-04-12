@@ -43,7 +43,7 @@ jobs:
         tags: >-
           latest
           ${{ env.IMAGE_VERSION }}
-        archs: amd64,arm64
+        archs: amd64
         context: ./images/${{ env.IMAGE_NAME }}
         containerfiles: |
           ./images/${{ env.IMAGE_NAME }}/Dockerfile
