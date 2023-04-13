@@ -90,7 +90,7 @@ jobs:
 
     - name: Test
       run: |
-        image='${{ env.IMAGE_NAME }}'
+        image='${{ steps.build.outputs.image }}'
         ids="$(
           for tag in ${{ steps.calculate.outputs.tags }} ; do
             buildah images --quiet --no-trunc "${image}:${tag}"
