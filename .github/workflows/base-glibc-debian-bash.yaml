@@ -99,9 +99,10 @@ jobs:
 
     - name: Check Tags
       run: |
+        set -x
         # FIX upstream: Quay.io does not support immutable images currently.
         #               => Try to use the REST API to check for duplicate tags.
-        respone="$(
+        response="$(
           curl -sL -H "Authorization: Bearer ${{ secrets.QUAY_BIOCONDA_TOKEN }}" \
             'https://quay.io/api/v1/repository/bioconda/${{ steps.build.outputs.image }}/image'
           )"
@@ -115,7 +116,7 @@ jobs:
               'Could not get list of image tags.' \
               'Does the repository exist on Quay.io?' \
               'Quay.io REST API response was:' \
-              "${respone}"
+              "${response}"
             exit 1
           }
         for tag in ${{ steps.calculate.outputs.tags }} ; do
