@@ -11,6 +11,8 @@ RUN [ ! -f /etc/apt/sources.list ] || sed --in-place= --regexp-extended \
       apt-get install --yes \
       --no-install-recommends \
       libgl1-mesa-glx \
+      libegl1 \
+      libopengl0 \
       locales \
       openssh-client \
       procps \
