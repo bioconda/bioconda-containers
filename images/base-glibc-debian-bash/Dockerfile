@@ -7,6 +7,8 @@ RUN apt-get update -qq \
     apt-get install --yes \
       --no-install-recommends \
       libgl1-mesa-glx \
+      libegl1 \
+      libopengl0 \
       locales \
       openssh-client \
       procps \
