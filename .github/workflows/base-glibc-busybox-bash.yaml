@@ -24,7 +24,7 @@ jobs:
       DEBIAN_VERSION: '10.9'
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v2
