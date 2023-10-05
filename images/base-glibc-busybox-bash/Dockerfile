@@ -15,6 +15,9 @@ FROM "debian:${debian_version}-slim" AS build_base
 # (or not want) to include.
 # Use old Debian version to ensure compatible (low glibc requirement) binaries.
 FROM debian:9-slim AS busybox_builder
+RUN echo "deb http://archive.debian.org/debian/ stretch main contrib non-free" > /etc/apt/sources.list
+RUN echo "deb http://archive.debian.org/debian/ stretch-proposed-updates main contrib non-free" >> /etc/apt/sources.list
+RUN echo "deb http://archive.debian.org/debian-security stretch/updates main contrib non-free" >> /etc/apt/sources.list
 RUN apt-get update && \
     apt-get install -y \
       bzip2 curl ca-certificates tar gcc gnupg dirmngr make
