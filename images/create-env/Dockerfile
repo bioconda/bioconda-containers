@@ -13,7 +13,7 @@ FROM quay.io/bioconda/base-glibc-debian-bash as build
 WORKDIR /tmp/work
 COPY --from=bioconda-build-env /tmp/requirements.txt ./
 COPY install-conda print-env-activate create-env ./
-RUN apt-get install -y wget && wget -o ./miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$(uname -m).sh
+RUN apt-get update && apt-get install -y wget && wget -o ./miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$(uname -m).sh
 
 RUN ./install-conda ./requirements.txt /opt/create-env
 
