@@ -14,7 +14,7 @@ on:
 jobs:
   build:
     name: Build & Push
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     env:
       # The base image is not intended to change often and should be used with
       # version tags or checksum IDs, but not via "latest".
