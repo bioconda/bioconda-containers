@@ -23,7 +23,7 @@ jobs:
           packages: "anaconda-client skopeo"
         - tag: update
           packages: "git openssh"
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     env:
       IMAGE_NAME: bot
       IMAGE_VERSION: '1.1.23'
