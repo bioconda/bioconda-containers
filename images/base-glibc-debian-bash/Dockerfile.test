@@ -24,14 +24,15 @@ RUN locale -a | grep -i 'c\.utf-\?8' \
 
 RUN apt-get update -qq \
     && \
-    apt-get install --yes --no-install-recommends \
+    DEBIAN_FRONTEND=noninteractive \
+      apt-get install --yes --no-install-recommends \
       ca-certificates \
       wget \
     && \
-    ARCH=$(uname -m) \
+    arch=$(uname -m) \
     && \
-    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-${ARCH}.sh \
+    wget "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-${arch}.sh" \
     && \
-    sh ./Miniconda3-latest-Linux-${ARCH}.sh -bp /opt/conda \
+    sh ./Miniforge3-Linux-${arch}.sh -bp /opt/conda \
     && \
     /opt/conda/bin/conda info --all
