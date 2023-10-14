@@ -47,8 +47,8 @@ jobs:
 
         container="$( buildah from "${image_id}" )"
         run() { buildah run "${container}" "${@}" ; }
-        deb_list="$( run cat /.deb.lst )"
-        pkg_list="$( run cat /.pkg.lst )"
+        deb_list="$( run cat /.deb.lst | tr '\n' '|' )"
+        pkg_list="$( run cat /.pkg.lst | tr '\n' '|' )"
         glibc="$( run sh -c 'exec "$( find /lib -name libc.so.6 -print -quit )"' | sed '1!d' )"
         busybox="$( run busybox | sed '1!d' )"
         bash="$( run bash --version | sed '1!d' )"
@@ -57,8 +57,8 @@ jobs:
         labels="
           glibc="${glibc}"
           busybox="${busybox}"
-          deb-list="${deb_list}"
-          pkg-list="${pkg_list}"
+          deb-list="${deb_list%|}"
+          pkg-list="${pkg_list%|}"
         "
 
         glibc_version="$( printf %s "${glibc}" | sed -E 's/.*version ([0-9.]*[0-9]).*/\1/' )"
