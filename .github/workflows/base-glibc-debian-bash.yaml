@@ -62,7 +62,7 @@ jobs:
           ${{ env.IMAGE_VERSION }}_${glibc_version}_${debian_version}_${bash_version}
           latest
         "
-        
+
         echo "tags=$( echo ${tags} )" >> $GITHUB_OUTPUT
         echo "labels=$( echo ${labels} )" >> $GITHUB_OUTPUT
 
