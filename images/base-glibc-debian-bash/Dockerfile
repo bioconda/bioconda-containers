@@ -63,6 +63,16 @@ RUN [ ! -f /etc/apt/sources.list ] || sed --in-place= --regexp-extended \
       -mindepth 1 -depth \
       -delete
 
+RUN dpkg-query --show --showformat \
+      '${db:Status-Status} ${Package}\n' \
+      | sed -n 's/:/%3a/g ; s/^installed //p' \
+      > /.pkg.lst \
+    && \
+    dpkg-query --show --showformat \
+      '${db:Status-Status} ${Package}_${Version}_${Architecture}\n' \
+      | sed -n 's/:/%3a/g ; s/$/.deb/ ; s/^installed //p' \
+      > /.deb.lst
+
 RUN while IFS=: read _ _ uid gid _ home _ ; do \
       [ -n "${home##/var/run/*}" ] || home="${home#/var}" \
       && \

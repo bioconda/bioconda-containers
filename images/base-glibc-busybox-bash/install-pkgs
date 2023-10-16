@@ -154,10 +154,10 @@ prepare() {
       # Abort if we get an unexpected package.
       printf %s\\n "\`prepare\` not defined for ${pkg}" >&2
       return 1
-      ;;
-    esac
-    prepare_remove_docs
-    prepare_usrmerge
+     ;;
+  esac
+  prepare_remove_docs
+  prepare_usrmerge
 }
 
 
