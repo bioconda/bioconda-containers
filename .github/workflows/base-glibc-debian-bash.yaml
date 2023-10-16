@@ -49,6 +49,7 @@ jobs:
         debian="$( run cat /etc/debian_version | sed '1!d' )"
         bash="$( run bash --version | sed '1!d' )"
         buildah rm "${container}"
+
         labels="
           glibc=${glibc}
           debian=${debian}
@@ -99,7 +100,6 @@ jobs:
 
     - name: Check Tags
       run: |
-        set -x
         # FIX upstream: Quay.io does not support immutable images currently.
         #               => Try to use the REST API to check for duplicate tags.
         response="$(
@@ -127,12 +127,9 @@ jobs:
             fi
           fi
         done
-      env:
-        TOKEN: ${{ secrets.secrets.QUAY_BIOCONDA_TOKEN }}
 
     - if: ${{ github.ref == 'refs/heads/main' }}
-      name: Push To quay.io
-      id: push-to-quay
+      name: Push
       uses: redhat-actions/push-to-registry@v2
       with:
         image: ${{ steps.build.outputs.image }}
@@ -144,12 +141,12 @@ jobs:
     - if: ${{ github.ref == 'refs/heads/main' }}
       name: Test Pushed
       run: |
-        image='${{ steps.build.outputs.image }}'
+        image='${{ env.IMAGE_NAME }}'
         ids="$(
           for tag in ${{ steps.calculate.outputs.tags }} ; do
             buildah images --quiet --no-trunc "${image}:${tag}"
           done
-        )"
+          )"
         ids="$( printf %s "${ids}" | sort -u )"
         for id in ${ids} ; do
           podman history "${id}"
