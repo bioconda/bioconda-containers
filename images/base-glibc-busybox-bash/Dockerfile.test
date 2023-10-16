@@ -19,7 +19,8 @@ RUN [ "$( sh -lc 'printf world' )" = 'world' ] \
 
 RUN arch=$(uname -m) \
     && \
-    wget "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-${arch}.sh" \
+    wget --quiet \
+      "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-${arch}.sh" \
     && \
     sh ./Miniforge3-Linux-${arch}.sh -bp /opt/conda \
     && \

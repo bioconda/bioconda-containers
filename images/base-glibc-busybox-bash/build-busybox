@@ -2,7 +2,7 @@
 set -xeu
 
 download() {
-  curl -L \
+  curl --location --silent \
     "https://busybox.net/downloads/busybox-${version}.tar.bz2" \
     | tar -xjf- --strip-components=1
 }
@@ -10,7 +10,7 @@ download() {
 patch() {
   case "${version}" in 1.36.* )
     # Small fix to let it build with older glibc versions.
-    curl --location \
+    curl --location --silent \
       'https://git.busybox.net/busybox/patch/miscutils/seedrng.c?id=200a9669fbf6f06894e4243cccc9fc11a1a6073a' \
       'https://git.busybox.net/busybox/patch/miscutils/seedrng.c?id=cb57abb46f06f4ede8d9ccbdaac67377fdf416cf' \
       | command patch --strip=1
