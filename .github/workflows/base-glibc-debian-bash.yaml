@@ -31,65 +31,68 @@ jobs:
       with:
         platforms: arm64
 
-    - name: Calculate tags and labels
-      id: calculate
+    - name: Build
+      id: build
       run: |
         set -xeu
         cd 'images/${{ env.IMAGE_NAME }}'
 
-        iidfile="$( mktemp )"
-        buildah bud --layers \
-          --iidfile="${iidfile}" \
-          --build-arg=debian_version="${{ env.DEBIAN_VERSION }}"
-        image_id="$( cat "${iidfile}" )"
-        rm "${iidfile}"
-
-        container="$( buildah from "${image_id}" )"
-        run() { buildah run "${container}" "${@}" ; }
-        deb_list="$( run cat /.deb.lst | tr '\n' '|' )"
-        pkg_list="$( run cat /.pkg.lst | tr '\n' '|' )"
-        glibc="$( run sh -c 'exec "$( find /lib -name libc.so.6 -print -quit )"' | sed '1!d' )"
-        debian="$( run cat /etc/debian_version | sed '1!d' )"
-        bash="$( run bash --version | sed '1!d' )"
-        buildah rm "${container}"
-
-        labels="
-          glibc=${glibc}
-          debian=${debian}
-          deb-list="${deb_list%|}"
-          pkg-list="${pkg_list%|}"
-        "
-
-        glibc_version="$( printf %s "${glibc}" | sed -E 's/.*version ([0-9.]*[0-9]).*/\1/' )"
-        debian_version="$( printf %s "${debian}" | sed -E 's|/|_|g' )"
-        bash_version="$( printf %s "${bash}" | sed -E 's/.*version ([0-9.]*[0-9]).*/\1/' )"
-        tags="
+        image_name='${{ env.IMAGE_NAME }}'
+        tags='
           ${{ env.MAJOR_VERSION }}
           ${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}
           latest
-        "
+        '
+        printf %s\\n \
+          "image=${image_name}" \
+          "tags=$( echo ${tags} )" \
+          >> $GITHUB_OUTPUT
 
-        echo "tags=$( echo ${tags} )" >> $GITHUB_OUTPUT
-        echo "labels=$( echo ${labels} )" >> $GITHUB_OUTPUT
+        for tag in ${tags} ; do
+          buildah manifest create "${image_name}:${tag}"
+        done
 
-    - name: Build multiarch image
-      id: build
-      uses: redhat-actions/buildah-build@v2
-      with:
-        image: ${{ env.IMAGE_NAME }}
-        tags: ${{ steps.calculate.outputs.tags }}
-        labels: ${{ steps.calculate.outputs.labels }}
-        archs: amd64,arm64
-        build-args: |
-          debian_version=${{ env.DEBIAN_VERSION }}
-        containerfiles: |
-          ./images/${{ env.IMAGE_NAME }}/Dockerfile
+        for arch in amd64 arm64 ; do
+          iidfile="$( mktemp )"
+          buildah bud --layers \
+            --arch="${arch}" \
+            --iidfile="${iidfile}" \
+            --build-arg=debian_version='${{ env.DEBIAN_VERSION }}'
+          image_id="$( cat "${iidfile}" )"
+          rm "${iidfile}"
+
+          container="$( buildah from "${image_id}" )"
+          run() { buildah run "${container}" "${@}" ; }
+          deb_list="$( run cat /.deb.lst | tr '\n' '|' | sed 's/|$//' )"
+          pkg_list="$( run cat /.pkg.lst | tr '\n' '|' | sed 's/|$//' )"
+          glibc="$( run sh -c 'exec "$( find -xdev -name libc.so.6 -print -quit )"' | sed '1!d' )"
+          debian="$( run cat /etc/debian_version | sed '1!d' )"
+          bash="$( run bash --version | sed '1!d' )"
+          buildah rm "${container}"
+
+          container="$( buildah from "${image_id}" )"
+          buildah config \
+            --label=glibc="${glibc}" \
+            --label=debian="${debian}" \
+            --label=bash="${bash}" \
+            --label=deb-list="${deb_list}" \
+            --label=pkg-list="${pkg_list}" \
+            "${container}"
+
+          image_id="$( buildah commit "${container}" )"
+          buildah rm "${container}"
+          for tag in ${tags} ; do
+            buildah manifest add \
+              "${image_name}:${tag}" \
+              "${image_id}"
+          done
+        done
 
     - name: Test
       run: |
         image='${{ steps.build.outputs.image }}'
         ids="$(
-          for tag in ${{ steps.calculate.outputs.tags }} ; do
+          for tag in ${{ steps.build.outputs.tags }} ; do
             buildah manifest inspect "${image}:${tag}" \
               | jq -r '.manifests[]|.digest' \
               | while read id ; do
@@ -129,7 +132,7 @@ jobs:
               "${response}"
             exit 1
           }
-        for tag in ${{ steps.calculate.outputs.tags }} ; do
+        for tag in ${{ steps.build.outputs.tags }} ; do
           case "${tag}" in
             latest | '${{ env.MAJOR_VERSION }}' ) ;;
             * )
@@ -145,7 +148,7 @@ jobs:
       uses: redhat-actions/push-to-registry@v2
       with:
         image: ${{ steps.build.outputs.image }}
-        tags: ${{ steps.calculate.outputs.tags }}
+        tags: ${{ steps.build.outputs.tags }}
         registry: ${{ secrets.QUAY_BIOCONDA_REPO }}
         username: ${{ secrets.QUAY_BIOCONDA_USERNAME }}
         password: ${{ secrets.QUAY_BIOCONDA_TOKEN }}
@@ -155,7 +158,7 @@ jobs:
       run: |
         image='${{ env.IMAGE_NAME }}'
         ids="$(
-          for tag in ${{ steps.calculate.outputs.tags }} ; do
+          for tag in ${{ steps.build.outputs.tags }} ; do
             buildah manifest inspect "${image}:${tag}" \
               | jq -r '.manifests[]|.digest' \
               | while read id ; do
