@@ -95,9 +95,13 @@ jobs:
           for tag in ${{ steps.calculate.outputs.tags }} ; do
             buildah manifest inspect "${image}:${tag}" \
               | jq -r '.manifests[]|.digest' \
-              | xargs -I'{}' buildah images --quiet --filter=digest='{}'
-          done | sort -u
+              | while read id ; do
+                  buildah images --format '{{.ID}}{{.Digest}}' \
+                  | sed -n "s/${id}//p"
+                done
+          done
           )"
+        ids="$( printf %s "${ids}" | sort -u )"
         for id in ${ids} ; do
           podman history "${id}"
           buildah bud \
@@ -155,9 +159,13 @@ jobs:
           for tag in ${{ steps.calculate.outputs.tags }} ; do
             buildah manifest inspect "${image}:${tag}" \
               | jq -r '.manifests[]|.digest' \
-              | xargs -I'{}' buildah images --quiet --filter=digest='{}'
-          done | sort -u
+              | while read id ; do
+                  buildah images --format '{{.ID}}{{.Digest}}' \
+                  | sed -n "s/${id}//p"
+                done
+          done
           )"
+        ids="$( printf %s "${ids}" | sort -u )"
         for id in ${ids} ; do
           podman history "${id}"
           buildah bud \
