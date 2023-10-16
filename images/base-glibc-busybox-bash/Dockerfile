@@ -82,6 +82,26 @@ RUN install-pkgs "$( pwd )" /tmp/work \
       -mindepth 1 -depth \
       -delete
 
+RUN while IFS=: read _ _ uid gid _ home _ ; do \
+      [ -n "${home##/var/run/*}" ] || home="${home#/var}" \
+      && \
+      [ -d "./${home#/}" ] || [ "${home}" = "/nonexistent" ] && continue ; \
+      mkdir -p "./${home#/}" \
+      && \
+      chown "${uid}:${gid}" "./${home#/}" \
+      && \
+      chmod 775 "./${home#/}" \
+    ; done < ./etc/passwd \
+    && \
+    pwck --read-only --root "$( pwd )" \
+      | { ! grep -v -e 'no changes' -e '/nonexistent' ; } \
+    && \
+    grpck --read-only --root "$( pwd )" \
+    && \
+    find -xdev -type f \
+      | xargs chroot . ldd 2> /dev/null -- \
+      | sed -n '/:/h; /not found/{x;p;x;p}' | { ! grep . ; }
+
 # env-activate.sh (+ optionally env-execute) should be overwritten downstream.
 # - env-activate.sh:
 #    Is sourced (via symlink in /etc/profile.d/) to activate the /usr/local env.
