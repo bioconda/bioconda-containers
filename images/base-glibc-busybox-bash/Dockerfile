@@ -3,11 +3,9 @@ ARG debian_version=10.8
 
 # Don't use Debian's busybox package since it only provides a smaller subset of
 # BusyBox's functions (e.g., no administrative tools like adduser etc.).
-# Since we create a glibc image anyway, we can also use "busybox:glibc" as the
-# base image, use a the slightly smaller dynamically linked binary and reuse
-# base files (e.g., /etc/passwd) from that image.
+# Since we create a glibc image anyway, we can also use a the slightly smaller
+# dynamically linked binary.
 
-FROM "busybox:${busybox_version}-glibc" AS target_base
 FROM "debian:${debian_version}-slim" AS build_base
 RUN [ ! -f /etc/apt/sources.list ] || sed --in-place= --regexp-extended \
       '/ stretch/ { /-updates/d ; s,/(deb|security)\.,/archive., }' \
@@ -32,26 +30,37 @@ COPY build-busybox ./
 ARG busybox_version
 RUN ./build-busybox "${busybox_version}"
 
+WORKDIR /busybox-rootfs
+RUN mkdir -p ./bin ./sbin ./usr/bin ./usr/sbin \
+    && \
+    cp -al /build/busybox ./bin/ \
+    && \
+    cp -al /lib/*-linux-gnu/*.so* ./ \
+    && \
+    chroot . ./ld-linux-*.so.* --library-path / /bin/busybox --install \
+    && \
+    rm -rf ./*.so*
+
 
 FROM build_base AS rootfs_builder
 
+COPY --from=busybox_builder /busybox-rootfs /busybox-rootfs
 WORKDIR /rootfs
-COPY --from=target_base / ./
 
-RUN find . -samefile ./bin/busybox -delete
-COPY --from=busybox_builder /build/busybox ./
-RUN mkdir -p \
-      ./bin ./usr/bin \
-      ./sbin ./usr/sbin \
-    && \
-    chroot . /busybox --install \
-    && \
-    # Somehow (container layers?) busybox does not have the same inode if it's
-    # directly put at /bin/busybox => hardlink it manually afterwards.
-    rm ./busybox && ln ./bin/ln ./bin/busybox
+RUN mkdir -p ./etc ./home ./opt ./root ./run /tmp ./usr ./var/log \
+     && \
+    for dir in bin lib sbin ; do \
+      mkdir "./usr/${dir}" \
+      && \
+      if [ -L "/bin" ] ; then \
+        ln -s "usr/${dir}" "./${dir}" ; \
+      else \
+        mkdir "./${dir}" ; \
+      fi ; \
+    done
 
-# Remove glibc files. They are incomplete and get substituted by `install-pkgs`.
-RUN rm -rf ./lib ./lib64
+RUN find /busybox-rootfs -type f \
+    -exec sh -c 'cp -al -- "${1}" "./${1#/busybox-rootfs/}"' -- '{}' ';'
 
 # Install helper tools used by install-pkgs.
 RUN apt-get update -qq \
@@ -63,8 +72,10 @@ RUN apt-get update -qq \
 COPY install-pkgs /usr/local/bin
 RUN install-pkgs "$( pwd )" /tmp/work \
       bash \
-      ncurses-base \
+      base-passwd \
       libc-bin \
+      login \
+      ncurses-base \
     && \
     # Remove contents of /usr/local as downstream images overwrite those.
     find ./usr/local/ \
