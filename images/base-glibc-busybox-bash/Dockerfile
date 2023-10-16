@@ -9,16 +9,20 @@ ARG debian_version=10.8
 
 FROM "busybox:${busybox_version}-glibc" AS target_base
 FROM "debian:${debian_version}-slim" AS build_base
+RUN [ ! -f /etc/apt/sources.list ] || sed --in-place= --regexp-extended \
+      '/ stretch/ { /-updates/d ; s,/(deb|security)\.,/archive., }' \
+      /etc/apt/sources.list
 
 
 # Build busybox ourselves to have more fine-grained control over what we want
 # (or not want) to include.
 # Use old Debian version to ensure compatible (low glibc requirement) binaries.
 FROM debian:9-slim AS busybox_builder
-RUN echo "deb http://archive.debian.org/debian/ stretch main contrib non-free" > /etc/apt/sources.list
-RUN echo "deb http://archive.debian.org/debian/ stretch-proposed-updates main contrib non-free" >> /etc/apt/sources.list
-RUN echo "deb http://archive.debian.org/debian-security stretch/updates main contrib non-free" >> /etc/apt/sources.list
-RUN apt-get update && \
+RUN [ ! -f /etc/apt/sources.list ] || sed --in-place= --regexp-extended \
+      '/ stretch/ { /-updates/d ; s,/(deb|security)\.,/archive., }' \
+      /etc/apt/sources.list \
+    && \
+    apt-get update && \
     apt-get install -y \
       bzip2 curl ca-certificates tar gcc gnupg dirmngr make patch
 

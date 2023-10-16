@@ -1,8 +1,11 @@
 ARG debian_version=10.8
 
 FROM "debian:${debian_version}-slim"
-
-RUN apt-get update -qq \
+RUN [ ! -f /etc/apt/sources.list ] || sed --in-place= --regexp-extended \
+      '/ stretch/ { /-updates/d ; s,/(deb|security)\.,/archive., }' \
+      /etc/apt/sources.list
+    && \
+    apt-get update -qq \
     && \
     apt-get install --yes \
       --no-install-recommends \
