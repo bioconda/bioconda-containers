@@ -20,10 +20,12 @@ RUN echo "deb http://archive.debian.org/debian/ stretch-proposed-updates main co
 RUN echo "deb http://archive.debian.org/debian-security stretch/updates main contrib non-free" >> /etc/apt/sources.list
 RUN apt-get update && \
     apt-get install -y \
-      bzip2 curl ca-certificates tar gcc gnupg dirmngr make
-COPY build-busybox /usr/local/bin
+      bzip2 curl ca-certificates tar gcc gnupg dirmngr make patch
+
+WORKDIR /build
+COPY build-busybox ./
 ARG busybox_version
-RUN build-busybox "${busybox_version}" /busybox
+RUN ./build-busybox "${busybox_version}"
 
 
 FROM build_base AS rootfs_builder
@@ -32,7 +34,7 @@ WORKDIR /rootfs
 COPY --from=target_base / ./
 
 RUN find . -samefile ./bin/busybox -delete
-COPY --from=busybox_builder /busybox/busybox ./
+COPY --from=busybox_builder /build/busybox ./
 RUN mkdir -p \
       ./bin ./usr/bin \
       ./sbin ./usr/sbin \
