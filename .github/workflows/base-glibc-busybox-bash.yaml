@@ -93,10 +93,11 @@ jobs:
         image='${{ steps.build.outputs.image }}'
         ids="$(
           for tag in ${{ steps.calculate.outputs.tags }} ; do
-            buildah images --quiet --no-trunc "${image}:${tag}"
-          done
+            buildah manifest inspect "${image}:${tag}" \
+              | jq -r '.manifests[]|.digest' \
+              | xargs -I'{}' buildah images --quiet --filter=digest='{}'
+          done | sort -u
           )"
-        ids="$( printf %s "${ids}" | sort -u )"
         for id in ${ids} ; do
           podman history "${id}"
           buildah bud \
@@ -150,16 +151,17 @@ jobs:
       name: Test Pushed
       run: |
         image='${{ env.IMAGE_NAME }}'
-        digests="$(
+        ids="$(
           for tag in ${{ steps.calculate.outputs.tags }} ; do
             buildah manifest inspect "${image}:${tag}" \
-              | jq -r '.manifests[]|.digest'
+              | jq -r '.manifests[]|.digest' \
+              | xargs -I'{}' buildah images --quiet --filter=digest='{}'
           done | sort -u
           )"
-        for digest in ${digests} ; do
-          podman history "${image}@${digest}"
+        for id in ${ids} ; do
+          podman history "${id}"
           buildah bud \
-            --build-arg=base="${image}@${digest}" \
+            --build-arg=base="${id}" \
             --file=Dockerfile.test \
             "images/${image}"
         done
