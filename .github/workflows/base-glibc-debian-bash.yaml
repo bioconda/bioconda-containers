@@ -20,7 +20,7 @@ jobs:
       # version tags or checksum IDs, but not via "latest".
       IMAGE_VERSION: '3.0.0'
       IMAGE_NAME: base-glibc-debian-bash
-      DEBIAN_VERSION: '10.9'
+      DEBIAN_VERSION: '12.2'
 
     steps:
     - uses: actions/checkout@v4

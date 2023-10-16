@@ -1,11 +1,9 @@
-ARG busybox_version=1.32.1
-ARG debian_version=10.8
-
 # Don't use Debian's busybox package since it only provides a smaller subset of
 # BusyBox's functions (e.g., no administrative tools like adduser etc.).
 # Since we create a glibc image anyway, we can also use a the slightly smaller
 # dynamically linked binary.
 
+ARG debian_version
 FROM "debian:${debian_version}-slim" AS build_base
 RUN [ ! -f /etc/apt/sources.list ] || sed --in-place= --regexp-extended \
       '/ stretch/ { /-updates/d ; s,/(deb|security)\.,/archive., }' \
