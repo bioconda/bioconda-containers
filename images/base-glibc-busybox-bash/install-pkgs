@@ -11,6 +11,22 @@ prepare_remove_docs() {
 }
 
 
+prepare_usrmerge() {
+  # If we are on Debian >=12, /bin et al. are symlinks to /usr/ counterparts.
+  # Since we don't do full apt installs, we accomodate for it here.
+  if [ -L "${root_fs}/bin" ] ; then
+    for dir in bin lib* sbin ; do
+      [ -d "./${dir}" ] || continue
+      [ -L "./${dir}" ] && continue
+      mkdir -p ./usr
+      cp -ral "./${dir}" ./usr/
+      rm -rf "./${dir}"
+      ln -s "usr/${dir}" "${dir}"
+    done
+  fi
+}
+
+
 add_rpath() {
   local binary="${1}"
   shift
@@ -120,6 +136,7 @@ prepare() {
       ;;
     esac
     prepare_remove_docs
+    prepare_usrmerge
 }
 
 
