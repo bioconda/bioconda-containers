@@ -23,8 +23,9 @@ RUN [ ! -f /etc/apt/sources.list ] || sed --in-place= --regexp-extended \
       /etc/apt/sources.list \
     && \
     apt-get update && \
-    apt-get install -y \
-      bzip2 curl ca-certificates tar gcc gnupg dirmngr make patch
+    DEBIAN_FRONTEND=noninteractive \
+      apt-get install --yes --no-install-recommends \
+      bzip2 curl ca-certificates tar gcc libc6-dev make patch
 
 WORKDIR /build
 COPY build-busybox ./
@@ -55,7 +56,8 @@ RUN rm -rf ./lib ./lib64
 # Install helper tools used by install-pkgs.
 RUN apt-get update -qq \
     && \
-    apt-get install --yes --no-install-recommends \
+    DEBIAN_FRONTEND=noninteractive \
+      apt-get install --yes --no-install-recommends \
       patchelf
 
 COPY install-pkgs /usr/local/bin

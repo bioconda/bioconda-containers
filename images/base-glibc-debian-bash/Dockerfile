@@ -3,11 +3,12 @@ ARG debian_version=10.8
 FROM "debian:${debian_version}-slim"
 RUN [ ! -f /etc/apt/sources.list ] || sed --in-place= --regexp-extended \
       '/ stretch/ { /-updates/d ; s,/(deb|security)\.,/archive., }' \
-      /etc/apt/sources.list
+      /etc/apt/sources.list \
     && \
     apt-get update -qq \
     && \
-    apt-get install --yes \
+    DEBIAN_FRONTEND=noninteractive \
+      apt-get install --yes \
       --no-install-recommends \
       libgl1-mesa-glx \
       locales \
@@ -26,7 +27,8 @@ RUN [ ! -f /etc/apt/sources.list ] || sed --in-place= --regexp-extended \
       's/\s*rm .*locale-archive$/: &/' \
       /var/lib/dpkg/info/locales.prerm \
     && \
-    apt-get remove --yes \
+    DEBIAN_FRONTEND=noninteractive \
+      apt-get remove --yes \
       locales \
     && \
     # On Debian 10 (and 11) libgl1-mesa-glx pulls in libgl1-mesa-dri (which in
@@ -36,7 +38,8 @@ RUN [ ! -f /etc/apt/sources.list ] || sed --in-place= --regexp-extended \
       '/^Depends:/ s/, libgl1-mesa-dri\>//g' \
       /var/lib/dpkg/status \
     && \
-    apt-get autoremove --yes \
+    DEBIAN_FRONTEND=noninteractive \
+      apt-get autoremove --yes \
     && \
     # Remove apt package lists.
     rm -rf /var/lib/apt/lists/* \
