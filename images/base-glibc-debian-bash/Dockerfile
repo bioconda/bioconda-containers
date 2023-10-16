@@ -2,16 +2,28 @@ ARG debian_version
 
 FROM "debian:${debian_version}-slim"
 RUN [ ! -f /etc/apt/sources.list ] || sed --in-place= --regexp-extended \
-      '/ stretch/ { /-updates/d ; s,/(deb|security)\.,/archive., }' \
+      '/ stretch/ { s,-updates,-backports, ; s,/(deb|security)\.,/archive., }' \
       /etc/apt/sources.list \
     && \
     apt-get update -qq \
     && \
     DEBIAN_FRONTEND=noninteractive \
-      apt-get install --yes \
-      --no-install-recommends \
-      libgl1-mesa-glx \
-      libegl1 \
+      apt-get install --yes --no-install-recommends \
+      $( \
+        . /etc/os-release \
+        && \
+        [ "${VERSION_ID-10}" -lt 10 ] \
+        && \
+        printf '%s\n' \
+          libegl1-mesa \
+          libgl1-mesa-glx \
+        || \
+        printf '%s\n' \
+          libegl1 \
+          libgl1 \
+          libglx-mesa0 \
+      ) \
+      libglvnd0 \
       libopengl0 \
       locales \
       openssh-client \

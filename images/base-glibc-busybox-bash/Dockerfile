@@ -6,7 +6,7 @@
 ARG debian_version
 FROM "debian:${debian_version}-slim" AS build_base
 RUN [ ! -f /etc/apt/sources.list ] || sed --in-place= --regexp-extended \
-      '/ stretch/ { /-updates/d ; s,/(deb|security)\.,/archive., }' \
+      '/ stretch/ { s,-updates,-backports, ; s,/(deb|security)\.,/archive., }' \
       /etc/apt/sources.list
 
 
@@ -15,7 +15,7 @@ RUN [ ! -f /etc/apt/sources.list ] || sed --in-place= --regexp-extended \
 # Use old Debian version to ensure compatible (low glibc requirement) binaries.
 FROM debian:9-slim AS busybox_builder
 RUN [ ! -f /etc/apt/sources.list ] || sed --in-place= --regexp-extended \
-      '/ stretch/ { /-updates/d ; s,/(deb|security)\.,/archive., }' \
+      '/ stretch/ { s,-updates,-backports, ; s,/(deb|security)\.,/archive., }' \
       /etc/apt/sources.list \
     && \
     apt-get update && \
