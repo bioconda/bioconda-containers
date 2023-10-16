@@ -33,11 +33,13 @@ RUN mkdir -p ./bin ./sbin ./usr/bin ./usr/sbin \
     && \
     cp -al /build/busybox ./bin/ \
     && \
-    cp -al /lib/*-linux-gnu/*.so* ./ \
+    ldd ./bin/busybox \
+      | grep --only-matching --extended-regexp '/lib\S+' \
+      | xargs -n1 sh -xc 'mkdir -p ".${1%/*}" && cp -aL "${1}" ".${1%/*}"' -- \
     && \
-    chroot . ./ld-linux-*.so.* --library-path / /bin/busybox --install \
+    chroot . /bin/busybox --install \
     && \
-    rm -rf ./*.so*
+    rm -rf ./lib*
 
 
 FROM build_base AS rootfs_builder
