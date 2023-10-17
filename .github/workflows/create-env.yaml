@@ -55,25 +55,26 @@ jobs:
 
     - name: Test
       run: |
+        set -x
         image='${{ steps.build.outputs.image }}'
-        ids="$(
-          for tag in ${{ steps.build.outputs.tags }} ; do
-            buildah manifest inspect "${image}:${tag}" \
-              | jq -r '.manifests[]|.digest' \
-              | while read id ; do
-                  buildah images --format '{{.ID}}{{.Digest}}' \
-                  | sed -n "s/${id}//p"
-                done
-          done
-          )"
-        ids="$( printf %s "${ids}" | sort -u )"
-        for id in ${ids} ; do
-          podman history "${id}"
-          buildah bud \
-            --build-arg=base="${id}" \
-            --file=Dockerfile.test \
-            "images/${image}"
-        done
+        for tag in ${{ steps.build.outputs.tags }} ; do
+          buildah manifest inspect \
+            "${image}:${tag}" \
+            | jq '.manifests|{([.[].digest]|sort|join("+")): [.[]|["'"${tag}"'", .platform.architecture, .digest]|join(" ")]}'
+          done \
+          | jq -rs 'add|add[]' \
+          | while read tag arch digest ; do
+              podman images --format='{{.ID}}|{{.Digest}}|{{.RepoDigests}}' \
+                | sed -n "/${digest}/{s/|.*//p;q}" \
+                | xargs -n1 -- \
+                  sh -xc \
+                  'podman history "${1}" ; podman inspect "${1}"' --
+              buildah bud \
+                --arch="${arch}" \
+                --build-arg=base="${image}:${tag}" \
+                --file=Dockerfile.test \
+                "images/${image}"
+            done
         buildah rmi --prune || true
 
     - name: Check Tags
@@ -121,23 +122,24 @@ jobs:
     - if: ${{ github.ref == 'refs/heads/main' }}
       name: Test Pushed
       run: |
-        image='${{ env.IMAGE_NAME }}'
-        ids="$(
-          for tag in ${{ steps.build.outputs.tags }} ; do
-            buildah manifest inspect "${image}:${tag}" \
-              | jq -r '.manifests[]|.digest' \
-              | while read id ; do
-                  buildah images --format '{{.ID}}{{.Digest}}' \
-                  | sed -n "s/${id}//p"
-                done
-          done
-          )"
-        ids="$( printf %s "${ids}" | sort -u )"
-        for id in ${ids} ; do
-          podman history "${id}"
-          buildah bud \
-            --build-arg=base="${id}" \
-            --file=Dockerfile.test \
-            "images/${image}"
-        done
+        set -x
+        image='${{ steps.build.outputs.image }}'
+        for tag in ${{ steps.build.outputs.tags }} ; do
+          buildah manifest inspect \
+            "${image}:${tag}" \
+            | jq '.manifests|{([.[].digest]|sort|join("+")): [.[]|["'"${tag}"'", .platform.architecture, .digest]|join(" ")]}'
+          done \
+          | jq -rs 'add|add[]' \
+          | while read tag arch digest ; do
+              podman images --format='{{.ID}}|{{.Digest}}|{{.RepoDigests}}' \
+                | sed -n "/${digest}/{s/|.*//p;q}" \
+                | xargs -n1 -- \
+                  sh -xc \
+                  'podman history "${1}" ; podman inspect "${1}"' --
+              buildah bud \
+                --arch="${arch}" \
+                --build-arg=base="${image}:${tag}" \
+                --file=Dockerfile.test \
+                "images/${image}"
+            done
         buildah rmi --prune || true
