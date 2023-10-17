@@ -21,17 +21,17 @@ miniconda_boostrap_prefix="$( pwd )/miniconda"
   # Only need `strip` executable from binutils. Other binaries from the package
   # and especially the "sysroot" dependency is only bloat for this container
   # image. (NOTE: The binary needs libgcc-ng which is explicitly added later.)
-  conda create --yes \
+  mamba create --yes \
     --prefix="${conda_install_prefix}" \
     --channel=conda-forge \
     binutils
   tmp_dir="${miniconda_boostrap_prefix}/tmp-strip"
   mkdir "${tmp_dir}"
   mv "${conda_install_prefix}/bin/"*strip "${tmp_dir}/"
-  conda remove --yes --all \
+  mamba remove --yes --all \
     --prefix="${conda_install_prefix}"
 
-  conda create --yes \
+  mamba create --yes \
     --prefix="${conda_install_prefix}" \
     --channel=conda-forge \
     \
