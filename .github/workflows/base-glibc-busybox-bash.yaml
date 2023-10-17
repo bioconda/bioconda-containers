@@ -92,6 +92,9 @@ jobs:
           image_id="$( buildah commit "${container}" )"
           buildah rm "${container}"
           for tag in ${tags} ; do
+            buildah tag \
+              "${image_id}" \
+              "${image_name}:${tag}-${arch}"
             buildah manifest add \
               "${image_name}:${tag}" \
               "${image_id}"
