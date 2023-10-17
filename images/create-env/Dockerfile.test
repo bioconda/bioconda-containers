@@ -38,7 +38,7 @@ RUN set -x && \
         --strip-files=\* \
         /usr/local \
         catfasta2phyml
-FROM bioconda/base-glibc-busybox-bash
+FROM quay.io/bioconda/base-glibc-busybox-bash
 COPY --from=build_bioconda_package /usr/local /usr/local
 RUN set -x && \
     /usr/local/env-execute \
@@ -64,7 +64,7 @@ RUN set -x && \
         --remove-paths=\*.pyc \
         /opt/conda \
         conda
-FROM bioconda/base-glibc-busybox-bash
+FROM quay.io/bioconda/base-glibc-busybox-bash
 COPY --from=build_conda /opt/conda /opt/conda
 COPY --from=build_conda /opt/conda/env-activate.sh /usr/local/
 RUN set -x && \
