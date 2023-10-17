@@ -98,9 +98,11 @@ RUN while IFS=: read _ _ uid gid _ home _ ; do \
     && \
     grpck --read-only --root "$( pwd )" \
     && \
-    find -xdev -type f \
-      | xargs chroot . ldd 2> /dev/null -- \
-      | sed -n '/:/h; /not found/{x;p;x;p}' | { ! grep . ; }
+    find \
+      -xdev -type f \! -path ./var/\* \! -path ./usr/share/\* \! -name \*.pl \
+      | xargs -P0 -n100 sh -c \
+        'chroot . ldd -- "${@}" 2> /dev/null | sed -n "/:/h; /not found/{x;p;x;p}"' -- \
+        | { ! grep . ; }
 
 # env-activate.sh (+ optionally env-execute) should be overwritten downstream.
 # - env-activate.sh:
