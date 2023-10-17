@@ -7,6 +7,10 @@ RUN [ ! -f /etc/apt/sources.list ] || sed --in-place= --regexp-extended \
     && \
     apt-get update -qq \
     && \
+    # Add en_US.UTF-8 locale.
+    printf '%s\n' 'en_US.UTF-8 UTF-8' \
+      >> /etc/locale.gen \
+    && \
     DEBIAN_FRONTEND=noninteractive \
       apt-get install --yes --no-install-recommends \
       $( \
@@ -28,13 +32,6 @@ RUN [ ! -f /etc/apt/sources.list ] || sed --in-place= --regexp-extended \
       locales \
       openssh-client \
       procps \
-    && \
-    # Add en_US.UTF-8 locale.
-    sed -i \
-      's/^# *\(en_US.UTF-8\)/\1/' \
-      /etc/locale.gen \
-    && \
-    locale-gen \
     && \
     # Remove "locales" package, but keep the generated locale.
     sed -i \
