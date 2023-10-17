@@ -27,7 +27,8 @@ miniconda_boostrap_prefix="$( pwd )/miniconda"
     binutils
   tmp_dir="${miniconda_boostrap_prefix}/tmp-strip"
   mkdir "${tmp_dir}"
-  mv "${conda_install_prefix}/bin/"*strip "${tmp_dir}/"
+  cp -a "${conda_install_prefix}/bin/"*strip "${tmp_dir}/"
+  conda run --prefix="${conda_install_prefix}" strip -- "${tmp_dir}/"*strip
   mamba remove --yes --all \
     --prefix="${conda_install_prefix}"
 
@@ -60,6 +61,10 @@ eval "${activate_script}"
 set -u
 unset activate_script
 
+# Run strip on find/xargs/grep beforehand as they are run in the strip pipeline.
+for prog in find xargs grep ; do
+  strip -- "$( command -v "${prog}" )"
+done
 
 # Use --conda=: to turn the `conda create` into a no-op, but do continue to
 # run strip, remove files and output the activate/execute scripts.
