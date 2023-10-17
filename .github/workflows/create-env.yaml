@@ -87,7 +87,7 @@ jobs:
 
         existing_tags="$(
           printf %s "${response}" \
-            | jq -r '.tags[]|.name'
+            | jq -r '.tags[]|select(.end_ts == null or .end_ts >= now)|.name'
           )" \
           || {
             printf %s\\n \
