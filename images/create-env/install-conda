@@ -79,8 +79,11 @@ rm -rf "${miniconda_boostrap_prefix}"
 conda config \
   --append channels conda-forge \
   --append channels bioconda \
-  --append channels defaults \
   ;
+conda config \
+  --remove channels defaults \
+  2> /dev/null \
+  || true
 conda config \
   --remove repodata_fns current_repodata.json \
   2> /dev/null \
