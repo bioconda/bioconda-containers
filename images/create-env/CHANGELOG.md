@@ -1,6 +1,21 @@
 # Changelog
 
 
+## bioconda/create-env 3.0 (2023-10-17)
+
+### Changed
+
+- Add linux-aarch64 image; bioconda/create-env is now a multiplatform manifest.
+
+- Change to a simple "major.minor" version scheme and offer mutable "major" tag.
+
+- Drop defaults channel from included config.
+
+- Use Miniforge installer to build this image.
+
+- Rebuilt on the latest base image with Debian 12.2 / BusyBox 1.36.1.
+
+
 ## bioconda/create-env 2.2.1 (2022-10-14)
 
 ### Changed
