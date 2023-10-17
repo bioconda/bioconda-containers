@@ -53,12 +53,20 @@ jobs:
           buildah manifest create "${image_name}:${tag}"
         done
 
+        iidfile="$( mktemp )"
+        buildah bud \
+          --iidfile="${iidfile}" \
+          --build-arg=busybox_version='${{ env.BUSYBOX_VERSION }}' \
+          --file=Dockerfile.busybox
+        busybox_image="$( cat "${iidfile}" )"
+        rm "${iidfile}"
+
         for arch in amd64 arm64 ; do
           iidfile="$( mktemp )"
           buildah bud --layers \
             --arch="${arch}" \
             --iidfile="${iidfile}" \
-            --build-arg=busybox_version='${{ env.BUSYBOX_VERSION }}' \
+            --build-arg=busybox_image="${busybox_image}" \
             --build-arg=debian_version='${{ env.DEBIAN_VERSION }}'
           image_id="$( cat "${iidfile}" )"
           rm "${iidfile}"

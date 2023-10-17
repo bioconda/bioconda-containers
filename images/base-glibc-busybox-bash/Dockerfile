@@ -10,28 +10,16 @@ RUN [ ! -f /etc/apt/sources.list ] || sed --in-place= --regexp-extended \
       /etc/apt/sources.list
 
 
-# Build busybox ourselves to have more fine-grained control over what we want
-# (or not want) to include.
-# Use old Debian version to ensure compatible (low glibc requirement) binaries.
-FROM debian:9-slim AS busybox_builder
-RUN [ ! -f /etc/apt/sources.list ] || sed --in-place= --regexp-extended \
-      '/ stretch/ { s,-updates,-backports, ; s,/(deb|security)\.,/archive., }' \
-      /etc/apt/sources.list \
-    && \
-    apt-get update && \
-    DEBIAN_FRONTEND=noninteractive \
-      apt-get install --yes --no-install-recommends \
-      bzip2 curl ca-certificates tar gcc libc6-dev make patch
+FROM build_base AS rootfs_builder
 
-WORKDIR /build
-COPY build-busybox ./
-ARG busybox_version
-RUN ./build-busybox "${busybox_version}"
-
+ARG busybox_image
+COPY --from="${busybox_image}" /build /build
 WORKDIR /busybox-rootfs
-RUN mkdir -p ./bin ./sbin ./usr/bin ./usr/sbin \
+RUN arch="$( uname -m )" \
     && \
-    cp -al /build/busybox ./bin/ \
+    mkdir -p ./bin ./sbin ./usr/bin ./usr/sbin \
+    && \
+    cp -al "/build/busybox.${arch}" ./bin/busybox \
     && \
     ldd ./bin/busybox \
       | grep --only-matching --extended-regexp '/lib\S+' \
@@ -41,10 +29,6 @@ RUN mkdir -p ./bin ./sbin ./usr/bin ./usr/sbin \
     && \
     rm -rf ./lib*
 
-
-FROM build_base AS rootfs_builder
-
-COPY --from=busybox_builder /busybox-rootfs /busybox-rootfs
 WORKDIR /rootfs
 
 RUN mkdir -p ./etc ./home ./opt ./root ./run /tmp ./usr ./var/log \

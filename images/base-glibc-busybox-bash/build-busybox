@@ -125,10 +125,16 @@ build() {
 
 main() {
   version="${1}"
+  shift
   download
   patch
-  config
-  build
+  for target ; do
+    export MAKEFLAGS="ARCH=${target} CROSS_COMPILE=${target}-linux-gnu-"
+    make clean
+    config
+    build
+    cp -al ./busybox "./busybox.${target}"
+  done
 }
 
 main "${@}"
