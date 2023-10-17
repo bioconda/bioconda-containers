@@ -54,7 +54,7 @@ jobs:
 
         for arch in amd64 arm64 ; do
           iidfile="$( mktemp )"
-          buildah bud --layers \
+          buildah bud \
             --arch="${arch}" \
             --iidfile="${iidfile}" \
             --build-arg=debian_version='${{ env.DEBIAN_VERSION }}'

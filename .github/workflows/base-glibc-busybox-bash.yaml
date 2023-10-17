@@ -63,7 +63,7 @@ jobs:
 
         for arch in amd64 arm64 ; do
           iidfile="$( mktemp )"
-          buildah bud --layers \
+          buildah bud \
             --arch="${arch}" \
             --iidfile="${iidfile}" \
             --build-arg=busybox_image="${busybox_image}" \
