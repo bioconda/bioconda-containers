@@ -16,7 +16,8 @@ jobs:
     name: Build & Push
     runs-on: ubuntu-22.04
     env:
-      IMAGE_VERSION: '3.0.0'
+      MAJOR_VERSION: 3
+      MINOR_VERSION: 0
       IMAGE_NAME: create-env
 
     steps:
@@ -33,16 +34,18 @@ jobs:
         curl -sSL \
           'https://raw.githubusercontent.com/bioconda/bioconda-common/master/common.sh' \
           | sed -n \
-            's/BIOCONDA_UTILS_TAG=v/::set-output name=bioconda_utils_version::/p'
+            's/BIOCONDA_UTILS_TAG=v/bioconda_utils_version=/p' \
+            >> $GITHUB_OUTPUT
 
     - name: Build
-      id: buildah-build
+      id: build
       uses: redhat-actions/buildah-build@v2
       with:
         image: ${{ env.IMAGE_NAME }}
         tags: >-
           latest
-          ${{ env.IMAGE_VERSION }}
+          ${{ env.MAJOR_VERSION }}
+          ${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}
         archs: amd64,arm64
         context: ./images/${{ env.IMAGE_NAME }}
         containerfiles: |
@@ -52,10 +55,15 @@ jobs:
 
     - name: Test
       run: |
-        image='${{ steps.buildah-build.outputs.image }}'
+        image='${{ steps.build.outputs.image }}'
         ids="$(
-          for tag in ${{ steps.buildah-build.outputs.tags }} ; do
-            buildah images --quiet --no-trunc "${image}:${tag}"
+          for tag in ${{ steps.build.outputs.tags }} ; do
+            buildah manifest inspect "${image}:${tag}" \
+              | jq -r '.manifests[]|.digest' \
+              | while read id ; do
+                  buildah images --format '{{.ID}}{{.Digest}}' \
+                  | sed -n "s/${id}//p"
+                done
           done
           )"
         ids="$( printf %s "${ids}" | sort -u )"
@@ -72,43 +80,40 @@ jobs:
       run: |
         # FIX upstream: Quay.io does not support immutable images currently.
         #               => Try to use the REST API to check for duplicate tags.
-        page=0
-        has_additional='true'
-        while [ "${has_additional}" = 'true' ] ; do
-          page="$(( page + 1 ))"
-          respone="$(
-            curl -sL \
-              'https://quay.io/api/v1/repository/bioconda/${{ steps.buildah-build.outputs.image }}/tag?limit=100&page='"${page}"
-            )"
-          has_additional="$( printf %s "${respone}" | jq -r '.has_additional' )"
-          existing_tags="$(
-            printf %s "${respone}" \
-              | jq -r '.tags[]|.name'
-            )" \
-            || {
-              >&2 printf %s\\n \
-                'Could not get list of image tags.' \
-                'Does the repository exist on Quay.io?' \
-                'Quay.io REST API response was:' \
-                "${respone}"
-              exit 1
-            }
-          for tag in ${{ steps.buildah-build.outputs.tags }} ; do
-            if [ \! "${tag}" = latest ] ; then
+        response="$(
+          curl -sL \
+            'https://quay.io/api/v1/repository/bioconda/${{ steps.build.outputs.image }}/tag/'
+          )"
+
+        existing_tags="$(
+          printf %s "${response}" \
+            | jq -r '.tags[]|.name'
+          )" \
+          || {
+            printf %s\\n \
+              'Could not get list of image tags.' \
+              'Does the repository exist on Quay.io?' \
+              'Quay.io REST API response was:' \
+              "${response}"
+            exit 1
+          }
+        for tag in ${{ steps.build.outputs.tags }} ; do
+          case "${tag}" in
+            latest | '${{ env.MAJOR_VERSION }}' ) ;;
+            * )
               if printf %s "${existing_tags}" | grep -qxF "${tag}" ; then
-                >&2 printf 'Tag %s already exists!\n' "${tag}"
+                printf 'Tag %s already exists!\n' "${tag}"
                 exit 1
               fi
-            fi
-          done
+          esac
         done
 
     - if: ${{ github.ref == 'refs/heads/main' }}
       name: Push
       uses: redhat-actions/push-to-registry@v2
       with:
-        image: ${{ steps.buildah-build.outputs.image }}
-        tags: ${{ steps.buildah-build.outputs.tags }}
+        image: ${{ steps.build.outputs.image }}
+        tags: ${{ steps.build.outputs.tags }}
         registry: ${{ secrets.QUAY_BIOCONDA_REPO }}
         username: ${{ secrets.QUAY_BIOCONDA_USERNAME }}
         password: ${{ secrets.QUAY_BIOCONDA_TOKEN }}
@@ -116,10 +121,15 @@ jobs:
     - if: ${{ github.ref == 'refs/heads/main' }}
       name: Test Pushed
       run: |
-        image='${{ steps.buildah-build.outputs.image }}'
+        image='${{ env.IMAGE_NAME }}'
         ids="$(
-          for tag in ${{ steps.buildah-build.outputs.tags }} ; do
-            buildah images --quiet --no-trunc "${image}:${tag}"
+          for tag in ${{ steps.build.outputs.tags }} ; do
+            buildah manifest inspect "${image}:${tag}" \
+              | jq -r '.manifests[]|.digest' \
+              | while read id ; do
+                  buildah images --format '{{.ID}}{{.Digest}}' \
+                  | sed -n "s/${id}//p"
+                done
           done
           )"
         ids="$( printf %s "${ids}" | sort -u )"

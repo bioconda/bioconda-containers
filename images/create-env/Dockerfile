@@ -1,5 +1,5 @@
 # Use the exact conda, mamba versions as used in bioconda-recipes' builds.
-ARG bioconda_utils_version='1.1.3'
+ARG bioconda_utils_version
 FROM quay.io/bioconda/bioconda-utils-build-env-cos7:${bioconda_utils_version} as bioconda-build-env
 RUN /opt/conda/bin/conda list \
       --export '^(conda|mamba)$' \
