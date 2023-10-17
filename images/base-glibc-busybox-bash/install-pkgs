@@ -1,12 +1,31 @@
 #! /bin/sh
 set -xeu
 
+arch=$(uname -m)
 
 prepare_remove_docs() {
   # remove lintian and docs (apart from copyright)
-  rm -rf ./usr/share/{lintian,man}
+  rm -rf \
+    ./usr/share/lintian \
+    ./usr/share/man
   find ./usr/share/doc/ -type f ! -name copyright -delete
   find ./usr/share/doc/ -type d -empty -delete
+}
+
+
+prepare_usrmerge() {
+  # If we are on Debian >=12, /bin et al. are symlinks to /usr/ counterparts.
+  # Since we don't do full apt installs, we accomodate for it here.
+  if [ -L "${root_fs}/bin" ] ; then
+    for dir in bin lib* sbin ; do
+      [ -d "./${dir}" ] || continue
+      [ -L "./${dir}" ] && continue
+      mkdir -p ./usr
+      cp -ral "./${dir}" ./usr/
+      rm -rf "./${dir}"
+      ln -s "usr/${dir}" "${dir}"
+    done
+  fi
 }
 
 
@@ -41,61 +60,92 @@ prepare() {
       # Update gconv-modules accordingly.
       # NOTE: When adding/removing any, check required dyn. linked libs!
 
-      local gconv_path='./usr/lib/x86_64-linux-gnu/gconv'
-      local gconv_modules_regex='UTF-\w+|UNICODE|ISO8859-(1|2|15)|CP125(0|1|2)|MACINTOSH'
-      local gconv_modules_file_tmp='./.tmp.gconv-modules'
+      local gconv_path="./usr/lib/${arch}-linux-gnu/gconv"
+      local gconv_modules_regex
+      if [ -e "${gconv_path}/gconv-modules.d/gconv-modules-extra.conf" ] ; then
+        gconv_modules_regex="$(
+          sed -nE 's/^module\s+\S+\s+\S+\s+(\S+)\s+.*/\1/p' \
+            < "${gconv_path}/gconv-modules" \
+            | sort -u \
+            | tr '\n' '|' \
+            | sed 's/|$//'
+        )"
+        : > "${gconv_path}/gconv-modules.d/gconv-modules-extra.conf"
+      else
+        gconv_modules_regex='UTF-\w+|UNICODE|ISO8859-(1|15)|CP1252|ANSI_X3\.110'
+        local gconv_modules_file_tmp='./.tmp.gconv-modules'
 
-      mv "${gconv_path}"/gconv-modules "${gconv_modules_file_tmp}"
+        mv "${gconv_path}"/gconv-modules "${gconv_modules_file_tmp}"
+
+        grep -E \
+          '^\s*$|^#|^(alias\s+.*|module\s+[^\s]+\s+[^\s]+)\s+\<('"${gconv_modules_regex}"')(//|\s)' \
+          "${gconv_modules_file_tmp}" \
+          | sed -nEe '1N;N;/^(#.*)\n.*\1/{D;D};P;D' | cat -s \
+          > "${gconv_path}"/gconv-modules
+        rm "${gconv_modules_file_tmp}"
+      fi
 
       find "${gconv_path}" \
         -mindepth 1 -maxdepth 1 \
+        -name '*.so' \
+        -type f \
         -regextype posix-extended \
         ! -regex '.*/('"${gconv_modules_regex}"').so' \
         -print -delete
 
-      grep -E \
-        '^\s*$|^#|^(alias\s+.*|module\s+[^\s]+\s+[^\s]+)\s+\<('"${gconv_modules_regex}"')(//|\s)' \
-        "${gconv_modules_file_tmp}" \
-        | sed -nEe '1N;N;/^(#.*)\n.*\1/{D;D};P;D' | cat -s \
-        > "${gconv_path}"/gconv-modules
-      rm "${gconv_modules_file_tmp}"
       iconvconfig --prefix ./
 
       ;;
     bash )
       rm -rf ./usr/share/locale
       # Add custom rpath for libtinfo (see below) to bash binaries.
-      local new_rpath='/lib/x86_64-linux-gnu/terminfo:/usr/lib/x86_64-linux-gnu/terminfo'
+      local new_rpath="/lib/${arch}-linux-gnu/terminfo:/usr/lib/${arch}-linux-gnu/terminfo"
       add_rpath ./bin/bash "${new_rpath}"
       add_rpath ./usr/bin/clear_console "${new_rpath}"
       ;;
-    libtinfo5 | \
-    libtinfo6 )
+    libtinfo* )
       # Move libtinfo libraries to a custom path to ensure it is not
       # unintentionally used in downstream images.
-      find ./usr/lib/x86_64-linux-gnu -type f \
+      find ./usr/lib/${arch}-linux-gnu -type f \
         | {
           while read binary ; do
-            add_rpath "${binary}" '/lib/x86_64-linux-gnu/terminfo'
+            add_rpath "${binary}" "/lib/${arch}-linux-gnu/terminfo"
           done
         }
 
-      mv ./lib/x86_64-linux-gnu ./temp
-      mkdir ./lib/x86_64-linux-gnu
-      mv ./temp ./lib/x86_64-linux-gnu/terminfo
+      mv ./lib/${arch}-linux-gnu ./temp
+      mkdir ./lib/${arch}-linux-gnu
+      mv ./temp ./lib/${arch}-linux-gnu/terminfo
 
-      mv ./usr/lib/x86_64-linux-gnu ./temp
-      mkdir ./usr/lib/x86_64-linux-gnu
-      mv ./temp ./usr/lib/x86_64-linux-gnu/terminfo
+      mv ./usr/lib/${arch}-linux-gnu ./temp
+      mkdir ./usr/lib/${arch}-linux-gnu
+      mv ./temp ./usr/lib/${arch}-linux-gnu/terminfo
       ;;
+    base-passwd )
+      # The dependencies libdebconfclient0 (and libselinux1 for Debian>=12)
+      # are needed for update-passwd, but we ignore them => remove the binary.
+      rm ./usr/sbin/update-passwd
+      ;;
+    login )
+      rm -rf ./usr/share/locale
+      # The following binaries provided by BusyBox or pull in more dependencies
+      # (PAM, libselinux1, and their dependencies) => remove them.
+      rm -f \
+       ./bin/login \
+       ./bin/su \
+       ./usr/bin/lastlog \
+       ./usr/bin/newgrp \
+       ./usr/bin/sg
+     ;;
     libc-bin | \
     libgcc1 | \
     base-files | \
-    gcc-6-base | \
-    gcc-8-base | \
-    gcc-10-base | \
+    gcc-*-base | \
     libcrypt1 | \
     libgcc-s1 | \
+    libdebconfclient0 | \
+    libpcre* | \
+    libselinux1 | \
     ncurses-base | \
     zlib1g )
       :
@@ -104,9 +154,10 @@ prepare() {
       # Abort if we get an unexpected package.
       printf %s\\n "\`prepare\` not defined for ${pkg}" >&2
       return 1
-      ;;
-    esac
-    prepare_remove_docs
+     ;;
+  esac
+  prepare_remove_docs
+  prepare_usrmerge
 }
 
 
@@ -133,6 +184,25 @@ postinst() {
       chroot ./ sh /base-files-postinst configure
       rm ./base-files-postinst
       ;;
+    base-passwd )
+      mkdir -p "${destdir}/etc"
+      cp -p --remove-destination \
+         "${destdir}/usr/share/base-passwd/group.master" \
+         ./etc/group
+      cp -p --remove-destination \
+         "${destdir}/usr/share/base-passwd/passwd.master" \
+         ./etc/passwd
+      DPKG_ROOT="$( pwd )" \
+        shadowconfig on
+      ;;
+    login )
+      for file in /var/log/faillog /etc/subuid /etc/subgid ; do
+        [ -f "./${file}" ] || continue
+        touch "${file}"
+        chown 0:0 "${file}"
+        chmod 644 "${file}"
+      done
+      ;;
     bash )
       # Replace BusyBox's sh by Bash
       rm -f ./bin/sh
@@ -153,17 +223,17 @@ postinst() {
 EOF
       ;;
     libc6 | \
+    libdebconfclient0 | \
     libgcc1 | \
     libcrypt1 | \
     libgcc-s1 | \
-    libtinfo5 | \
-    libtinfo6 | \
+    libpcre* | \
+    libselinux1 | \
+    libtinfo* | \
     zlib1g )
       postinst_ldconfig_trigger
       ;;
-    gcc-6-base | \
-    gcc-8-base | \
-    gcc-10-base | \
+    gcc-*-base | \
     ncurses-base )
       :
       ;;
@@ -222,7 +292,10 @@ get_deps() {
 
   local ignore_pkgs
   ignore_pkgs="$(
-    printf %s\\n base-files '<awk>' debianutils dash \
+    printf %s\\n \
+      base-files '<awk>' debianutils dash \
+      libdebconfclient0 libselinux1 \
+      libaudit1 libpam-modules libpam-runtime libpam0g \
       | grep -vFx "$( printf %s\\n "${@}" )"
   )"
   [ -f "${root_fs}/.pkg.lst" ] && \
@@ -270,7 +343,7 @@ main() {
   # Unconditionally install glibc (package libc6).
   # Also install dependencies acc. to `apt-cache depends`:
   #  - libgcc1 only consists of libgcc_s.so.1 (+ docs, which we remove).
-  #  - gcc-{6,7,8}-base only has empty directories (+ docs, which we remove).
+  #  - gcc-*-base only has empty directories (+ docs, which we remove).
   install_with_deps libc6
 
   # libc-bin must be in ${@} for Unicode support (C.UTF-8 locale).

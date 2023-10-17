@@ -14,68 +14,91 @@ on:
 jobs:
   build:
     name: Build & Push
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     env:
       # The base image is not intended to change often and should be used with
       # version tags or checksum IDs, but not via "latest".
-      IMAGE_VERSION: '2.1.0'
+      MAJOR_VERSION: 3
+      MINOR_VERSION: 0
       IMAGE_NAME: base-glibc-debian-bash
-      DEBIAN_VERSION: '10.9'
+      DEBIAN_VERSION: '12.2'
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+      with:
+        platforms: arm64
 
     - name: Build
-      id: buildah-build
+      id: build
       run: |
         set -xeu
         cd 'images/${{ env.IMAGE_NAME }}'
 
-        iidfile="$( mktemp )"
-        buildah bud --layers \
-          --iidfile="${iidfile}" \
-          --build-arg=debian_version="${{ env.DEBIAN_VERSION }}"
-        image_id="$( cat "${iidfile}" )"
-        rm "${iidfile}"
-
-        container="$( buildah from "${image_id}" )"
-        run() { buildah run "${container}" "${@}" ; }
-        glibc="$( run sh -c 'exec "$( find /lib -name libc.so.6 -print -quit )"' | sed '1!d' )"
-        debian="$( run cat /etc/debian_version | sed '1!d' )"
-        bash="$( run bash --version | sed '1!d' )"
-        buildah rm "${container}"
-
-        container="$( buildah from "${image_id}" )"
-        buildah config --label=glibc="${glibc}" "${container}"
-        buildah config --label=debian="${debian}" "${container}"
-
-        glibc_version="$( printf %s "${glibc}" | sed -E 's/.*version ([0-9.]*[0-9]).*/\1/' )"
-        debian_version="$( printf %s "${debian}" | sed -E 's|/|_|g' )"
-        bash_version="$( printf %s "${bash}" | sed -E 's/.*version ([0-9.]*[0-9]).*/\1/' )"
-        tags="
-          ${{ env.IMAGE_VERSION }}
-          ${{ env.IMAGE_VERSION }}_${glibc_version}_${debian_version}_${bash_version}
-          latest
-        "
-
-        image_id="$( buildah commit "${container}" )"
-        buildah rm "${container}"
         image_name='${{ env.IMAGE_NAME }}'
+        tags='
+          ${{ env.MAJOR_VERSION }}
+          ${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}
+          latest
+        '
+        printf %s\\n \
+          "image=${image_name}" \
+          "tags=$( echo ${tags} )" \
+          >> $GITHUB_OUTPUT
 
         for tag in ${tags} ; do
-          buildah tag "${image_id}" \
-            "${image_name}":"${tag}"
+          buildah manifest create "${image_name}:${tag}"
         done
 
-        echo "::set-output name=image::${image_name}"
-        echo "::set-output name=tags::$( echo ${tags} )"
+        for arch in amd64 arm64 ; do
+          iidfile="$( mktemp )"
+          buildah bud --layers \
+            --arch="${arch}" \
+            --iidfile="${iidfile}" \
+            --build-arg=debian_version='${{ env.DEBIAN_VERSION }}'
+          image_id="$( cat "${iidfile}" )"
+          rm "${iidfile}"
+
+          container="$( buildah from "${image_id}" )"
+          run() { buildah run "${container}" "${@}" ; }
+          deb_list="$( run cat /.deb.lst | tr '\n' '|' | sed 's/|$//' )"
+          pkg_list="$( run cat /.pkg.lst | tr '\n' '|' | sed 's/|$//' )"
+          glibc="$( run sh -c 'exec "$( find -xdev -name libc.so.6 -print -quit )"' | sed '1!d' )"
+          debian="$( run cat /etc/debian_version | sed '1!d' )"
+          bash="$( run bash --version | sed '1!d' )"
+          buildah rm "${container}"
+
+          container="$( buildah from "${image_id}" )"
+          buildah config \
+            --label=glibc="${glibc}" \
+            --label=debian="${debian}" \
+            --label=bash="${bash}" \
+            --label=deb-list="${deb_list}" \
+            --label=pkg-list="${pkg_list}" \
+            "${container}"
+
+          image_id="$( buildah commit "${container}" )"
+          buildah rm "${container}"
+          for tag in ${tags} ; do
+            buildah manifest add \
+              "${image_name}:${tag}" \
+              "${image_id}"
+          done
+        done
 
     - name: Test
       run: |
-        image='${{ steps.buildah-build.outputs.image }}'
+        image='${{ steps.build.outputs.image }}'
         ids="$(
-          for tag in ${{ steps.buildah-build.outputs.tags }} ; do
-            buildah images --quiet --no-trunc "${image}:${tag}"
+          for tag in ${{ steps.build.outputs.tags }} ; do
+            buildah manifest inspect "${image}:${tag}" \
+              | jq -r '.manifests[]|.digest' \
+              | while read id ; do
+                  buildah images --format '{{.ID}}{{.Digest}}' \
+                  | sed -n "s/${id}//p"
+                done
           done
           )"
         ids="$( printf %s "${ids}" | sort -u )"
@@ -92,41 +115,40 @@ jobs:
       run: |
         # FIX upstream: Quay.io does not support immutable images currently.
         #               => Try to use the REST API to check for duplicate tags.
-        response=$(
-          curl -H "Authorization: Bearer $TOKEN" \
-             -sL \
-            'https://quay.io/api/v1/repository/bioconda/${{ steps.buildah-build.outputs.image }}/image'
-          )
+        response="$(
+          curl -sL \
+            'https://quay.io/api/v1/repository/bioconda/${{ steps.build.outputs.image }}/tag/'
+          )"
 
         existing_tags="$(
           printf %s "${response}" \
-            | jq -r '.images[].tags[]'
+            | jq -r '.tags[]|.name'
           )" \
           || {
             printf %s\\n \
               'Could not get list of image tags.' \
               'Does the repository exist on Quay.io?' \
               'Quay.io REST API response was:' \
-              "${respone}"
+              "${response}"
             exit 1
           }
-        for tag in ${{ steps.buildah-build.outputs.tags }} ; do
-          if [ \! "${tag}" = latest ] ; then
-            if printf %s "${existing_tags}" | grep -qxF "${tag}" ; then
-              printf 'Tag %s already exists!\n' "${tag}"
-              exit 1
-            fi
-          fi
+        for tag in ${{ steps.build.outputs.tags }} ; do
+          case "${tag}" in
+            latest | '${{ env.MAJOR_VERSION }}' ) ;;
+            * )
+              if printf %s "${existing_tags}" | grep -qxF "${tag}" ; then
+                printf 'Tag %s already exists!\n' "${tag}"
+                exit 1
+              fi
+          esac
         done
-      env:
-        TOKEN: ${{ secrets.secrets.QUAY_BIOCONDA_TOKEN }}
 
     - if: ${{ github.ref == 'refs/heads/main' }}
       name: Push
       uses: redhat-actions/push-to-registry@v2
       with:
-        image: ${{ steps.buildah-build.outputs.image }}
-        tags: ${{ steps.buildah-build.outputs.tags }}
+        image: ${{ steps.build.outputs.image }}
+        tags: ${{ steps.build.outputs.tags }}
         registry: ${{ secrets.QUAY_BIOCONDA_REPO }}
         username: ${{ secrets.QUAY_BIOCONDA_USERNAME }}
         password: ${{ secrets.QUAY_BIOCONDA_TOKEN }}
@@ -134,12 +156,17 @@ jobs:
     - if: ${{ github.ref == 'refs/heads/main' }}
       name: Test Pushed
       run: |
-        image='${{ steps.buildah-build.outputs.image }}'
+        image='${{ env.IMAGE_NAME }}'
         ids="$(
-          for tag in ${{ steps.buildah-build.outputs.tags }} ; do
-            buildah images --quiet --no-trunc "${image}:${tag}"
+          for tag in ${{ steps.build.outputs.tags }} ; do
+            buildah manifest inspect "${image}:${tag}" \
+              | jq -r '.manifests[]|.digest' \
+              | while read id ; do
+                  buildah images --format '{{.ID}}{{.Digest}}' \
+                  | sed -n "s/${id}//p"
+                done
           done
-        )"
+          )"
         ids="$( printf %s "${ids}" | sort -u )"
         for id in ${ids} ; do
           podman history "${id}"

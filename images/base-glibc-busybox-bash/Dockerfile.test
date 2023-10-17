@@ -17,9 +17,11 @@ RUN [ "$( sh -lc 'printf world' )" = 'world' ] \
     printf '' \
       > /usr/local/env-activate.sh
 
-COPY --from=debian:9-slim /lib/x86_64-linux-gnu/libz.so* /lib/x86_64-linux-gnu/
-RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
+RUN arch=$(uname -m) \
     && \
-    sh ./Miniconda3-latest-Linux-x86_64.sh -bp /opt/conda \
+    wget --quiet \
+      "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-${arch}.sh" \
+    && \
+    sh ./Miniforge3-Linux-${arch}.sh -bp /opt/conda \
     && \
     /opt/conda/bin/conda info --all
