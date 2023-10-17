@@ -158,16 +158,33 @@ if [ -n "${strip_files_globs}" ] ; then
     # Strip binaries. (Run strip on all files; ignore errors for non-ELF files.)
     # Limit open fds (ulimit -n) for strip (small number chosen arbitrarily).
     # (To avoid "could not create temporary file to hold stripped copy: Too many open files")
+
+    # Filter out the binaries currently in use by the pipeline via sed below.
+    skip_inode_expressions="$(
+      command -v -- find xargs sed strip \
+      | xargs -- stat -L -c '-e /^%d,%i:/d' --
+    )"
     find "${prefix}" \
       -type f \
       \( "${@}" \) \
       -print0 \
       | xargs \
-          --null \
+          -0 \
           -n 64 \
+          -- \
+          stat -L -c '%d,%i:%n' -- \
+      | sed \
+        ${skip_inode_expressions} \
+        -e 's/^[^:]*://' \
+      | tr \\n \\0 \
+      |
+        xargs \
+          -0 \
+          -n 64 \
+          -- \
           strip -- \
         2>&1 \
-      | grep -v ': file format not recognized' \
+      | sed '/: file format not recognized/d' \
       || true
   )
 fi

@@ -1,4 +1,4 @@
-#! /bin/bash -eu
+#! /bin/bash -eux
 
 requirements_file="${1}"
 conda_install_prefix="${2}"
@@ -7,6 +7,14 @@ conda_install_prefix="${2}"
 miniconda_boostrap_prefix="$( pwd )/miniconda"
 # Run the following in a subshell to avoid environment changes from bootstrap.
 (
+
+  # Use the base image-provided tools if they work for us:
+  tools=''
+  find -print0 -maxdepth 0 && xargs -0 true < /dev/null \
+    || tools="${tools} findutils"
+  sed -e '' < /dev/null \
+    || tools="${tools} sed"
+
   sh ./miniconda.sh \
     -b \
     -p "${miniconda_boostrap_prefix}"
@@ -25,10 +33,8 @@ miniconda_boostrap_prefix="$( pwd )/miniconda"
     --prefix="${conda_install_prefix}" \
     --channel=conda-forge \
     binutils
-  tmp_dir="${miniconda_boostrap_prefix}/tmp-strip"
-  mkdir "${tmp_dir}"
-  cp -a "${conda_install_prefix}/bin/"*strip "${tmp_dir}/"
-  conda run --prefix="${conda_install_prefix}" strip -- "${tmp_dir}/"*strip
+  cp -aL "${conda_install_prefix}/bin/strip" ./strip
+  conda run --prefix="${conda_install_prefix}" strip -- ./strip
   mamba remove --yes --all \
     --prefix="${conda_install_prefix}"
 
@@ -41,15 +47,14 @@ miniconda_boostrap_prefix="$( pwd )/miniconda"
     tini \
     \
     libgcc-ng \
-    findutils \
+    ${tools} \
     ;
 
   mv \
     ./print-env-activate \
     ./create-env \
-    "${tmp_dir}/"* \
+    ./strip \
     "${conda_install_prefix}/bin/"
-  rmdir "${tmp_dir}"
 )
 
 # Activate the new base environment.
@@ -61,9 +66,12 @@ eval "${activate_script}"
 set -u
 unset activate_script
 
-# Run strip on find/xargs/grep beforehand as they are run in the strip pipeline.
-for prog in find xargs grep ; do
-  strip -- "$( command -v "${prog}" )"
+# Strip find/xargs/sed beforehand as they are excluded in the strip pipeline.
+for prog in find xargs sed ; do
+  case "$( command -v "${prog}" )" in
+    "${conda_install_prefix%%/}"/* )
+      strip -- "$( command -v "${prog}" )"
+  esac
 done
 
 # Use --conda=: to turn the `conda create` into a no-op, but do continue to

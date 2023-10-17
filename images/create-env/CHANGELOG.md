@@ -15,6 +15,8 @@
 
 - Rebuilt on the latest base image with Debian 12.2 / BusyBox 1.36.1.
 
+- Do not install findutils, sed if provided by the base image (as is currently).
+
 
 ## bioconda/create-env 2.2.1 (2022-10-14)
 
