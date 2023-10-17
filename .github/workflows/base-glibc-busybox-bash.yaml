@@ -63,7 +63,7 @@ jobs:
 
         for arch in amd64 arm64 ; do
           iidfile="$( mktemp )"
-          buildah bud --layers \
+          buildah bud \
             --arch="${arch}" \
             --iidfile="${iidfile}" \
             --build-arg=busybox_image="${busybox_image}" \
@@ -135,7 +135,7 @@ jobs:
 
         existing_tags="$(
           printf %s "${response}" \
-            | jq -r '.tags[]|.name'
+            | jq -r '.tags[]|select(.end_ts == null or .end_ts >= now)|.name'
           )" \
           || {
             printf %s\\n \
