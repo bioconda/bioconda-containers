@@ -1,7 +1,6 @@
 import logging
 import os
 import re
-import sys
 
 from aiohttp import ClientSession
 from yaml import safe_load
