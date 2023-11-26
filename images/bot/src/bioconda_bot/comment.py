@@ -51,6 +51,8 @@ async def make_artifact_comment(session: ClientSession, pr: int, sha: str) -> No
                 comment += "noarch |"
             elif subdir == "linux-64":
                 comment += "linux-64 |"
+            elif subdir == "linux-aarch64":
+                comment += "linux-aarch64 |"
             else:
                 comment += "osx-64 |"
             comment += f" {packageName} | [{archdir}]({URL})\n"
