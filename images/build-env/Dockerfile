@@ -32,7 +32,8 @@ RUN . /opt/conda/etc/profile.d/conda.sh && \
 
 FROM base as build
 WORKDIR /tmp/repo
-COPY ./bioconda-utils/ ./
+ARG BIOCONDA_UTILS_FOLDER=./bioconda-utils/
+COPY ${BIOCONDA_UTILS_FOLDER} ./
 RUN . /opt/conda/etc/profile.d/conda.sh  && conda list
 RUN . /opt/conda/etc/profile.d/conda.sh  && conda activate base && \
     pip wheel . && \
