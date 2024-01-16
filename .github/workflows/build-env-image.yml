@@ -8,6 +8,9 @@ on:
     paths:
     - 'images/build-env/**'
     - '.github/workflows/build-env-image.yml'
+  push:
+    branches:
+      - 'main'
 
 jobs:
   build:
@@ -112,4 +115,3 @@ jobs:
             inputs: quay.io/${{ secrets.QUAY_BIOCONDA_USERNAME }}/${{ matrix.cfg.DOCKER_MANIFEST }}:${{ matrix.cfg.DOCKER_TAG }}
             images: ${{ steps.interpolate.outputs.DOCKER_IMAGES }}
             push: true
-
