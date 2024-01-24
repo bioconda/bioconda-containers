@@ -29,10 +29,10 @@ jobs:
       matrix:
         include:
           - arch: arm64
-            image: bioconda/bioconda-utils-build-env-cos7-aarch64
+            image: ${{ vars.QUAY_BIOCONDA_USERNAME }}/bioconda-utils-build-env-cos7-aarch64
             base_image: quay.io/condaforge/linux-anvil-aarch64
           - arch: amd64
-            image: bioconda/bioconda-utils-build-env-cos7-x86_64
+            image: ${{ vars.QUAY_BIOCONDA_USERNAME }}/bioconda-utils-build-env-cos7-x86_64
             base_image: quay.io/condaforge/linux-anvil-cos7-x86_64
     steps:
     - name: Checkout bioconda-containers
@@ -81,7 +81,7 @@ jobs:
         image: ${{ steps.buildah-build.outputs.image }}
         tags: ${{ steps.buildah-build.outputs.tags }}
         registry: ${{ secrets.QUAY_BIOCONDA_REPO }}
-        username: ${{ secrets.QUAY_BIOCONDA_USERNAME }}
+        username: ${{ vars.QUAY_BIOCONDA_USERNAME }}
         password: ${{ secrets.QUAY_BIOCONDA_TOKEN }}
 
   build-manifest:
@@ -104,19 +104,19 @@ jobs:
         id: interpolate
         run: |
           set -x
-          INTERPOLATED=`echo "${{ env.DOCKER_IMAGES }}" | sed "s#<<USER>>#${{ secrets.QUAY_BIOCONDA_USERNAME }}#g" | sed "s#<<TAG>>#${{ matrix.tag }}#g"`
+          INTERPOLATED=`echo "${{ env.DOCKER_IMAGES }}" | sed "s#<<USER>>#${{ vars.QUAY_BIOCONDA_USERNAME }}#g" | sed "s#<<TAG>>#${{ matrix.tag }}#g"`
           echo "DOCKER_IMAGES=${INTERPOLATED}" >> "$GITHUB_OUTPUT"
 
       - name: Login to Quay.io registry
         uses: docker/login-action@v2
         with:
           registry: ${{ secrets.QUAY_BIOCONDA_REPO }}
-          username: ${{ secrets.QUAY_BIOCONDA_USERNAME }}
+          username: ${{ vars.QUAY_BIOCONDA_USERNAME }}
           password: ${{ secrets.QUAY_BIOCONDA_TOKEN }}
 
       - name: Push Docker manifest list for quay.io/bioconda
         uses: Noelware/docker-manifest-action@v0.3.0
         with:
-            inputs: quay.io/${{ secrets.QUAY_BIOCONDA_USERNAME }}/${{ env.DOCKER_MANIFEST }}:${{ matrix.tag }}
+            inputs: quay.io/${{ vars.QUAY_BIOCONDA_USERNAME }}/${{ env.DOCKER_MANIFEST }}:${{ matrix.tag }}
             images: ${{ steps.interpolate.outputs.DOCKER_IMAGES }}
             push: true
