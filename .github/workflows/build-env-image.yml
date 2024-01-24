@@ -70,13 +70,11 @@ jobs:
     - name: Test built image
       id: test
       run: |
-        jq --version
-        echo "${{ steps.buildah-build.outputs.tags }}"
         image='${{ steps.buildah-build.outputs.image }}'
         for tag in ${{ steps.buildah-build.outputs.tags }} ; do
           podman run --rm "${image}:${tag}" bioconda-utils --version
         done
-        tags_json=$(jq --compact-output --null-input '$ARGS.positional' --args -- "${{ steps.buildah-build.outputs.tags }}")
+        tags_json=$(echo -n "${{ steps.buildah-build.outputs.tags }}" | jq --compact-output --raw-input --slurp 'split(" ")')
         echo $tags_json
         echo "tags=${tags_json}" >> $GITHUB_OUTPUT
 
