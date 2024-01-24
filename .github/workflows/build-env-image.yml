@@ -119,8 +119,17 @@ jobs:
           password: ${{ secrets.QUAY_BIOCONDA_TOKEN }}
 
       - name: Push Docker manifest list for quay.io/bioconda
-        uses: Noelware/docker-manifest-action@v0.3.0
-        with:
-            inputs: quay.io/${{ vars.QUAY_BIOCONDA_USERNAME }}/${{ env.DOCKER_MANIFEST }}:${{ matrix.tag }}
-            images: ${{ steps.interpolate.outputs.DOCKER_IMAGES }}
-            push: true
+        run: |
+          PREFIX=${{ secrets.QUAY_BIOCONDA_REPO }}/${{ vars.QUAY_BIOCONDA_USERNAME }}
+          docker manifest create ${PREFIX}/${{ env.DOCKER_MANIFEST }}:${{ matrix.tag }} \
+            --amend ${PREFIX}/bioconda-utils-build-env-cos7-x86_64:${{ matrix.tag }} \
+            --amend ${PREFIX}/bioconda-utils-build-env-cos7-aarch64:${{ matrix.tag }}
+          
+          docker manifest inspect ${PREFIX}/${{ env.DOCKER_MANIFEST }}:${{ matrix.tag }}
+          
+          docker manifest push ${PREFIX}/${{ env.DOCKER_MANIFEST }}:${{ matrix.tag }}
+        # uses: Noelware/docker-manifest-action@v0.3.0
+        # with:
+        #     inputs: quay.io/${{ vars.QUAY_BIOCONDA_USERNAME }}/${{ env.DOCKER_MANIFEST }}:${{ matrix.tag }}
+        #     images: ${{ steps.interpolate.outputs.DOCKER_IMAGES }}
+        #     push: true
