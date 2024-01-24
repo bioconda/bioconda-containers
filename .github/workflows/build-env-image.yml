@@ -15,15 +15,14 @@ on:
       - 'images/build-env/**'
       - '.github/workflows/build-env-image.yml'
 
-
+env:
+  MAJOR_VERSION: 3
+  MINOR_VERSION: 0
+  
 jobs:
   build:
     name: Build image - ${{ matrix.image }}
     runs-on: ubuntu-22.04
-    env:
-      MAJOR_VERSION: 3
-      MINOR_VERSION: 0
-
     strategy:
       matrix:
         include:
@@ -45,11 +44,11 @@ jobs:
         repository: 'bioconda/bioconda-utils'
         path: 'bioconda-utils'
 
-    - name: Install qemu dependency
-      if: ${{ matrix.arch == 'arm64' }}
+    - name: Install QEMU dependency
+      if: ${{ matrix.arch != 'amd64' }}
       uses: docker/setup-qemu-action@v3
       with:
-        platforms: arm64
+        platforms: ${{ matrix.arch }}
 
     - name: Build image
       id: buildah-build
