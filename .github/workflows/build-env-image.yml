@@ -70,6 +70,7 @@ jobs:
     - name: Test built image
       id: test
       run: |
+        jq --version
         echo "${{ steps.buildah-build.outputs.tags }}"
         image='${{ steps.buildah-build.outputs.image }}'
         for tag in ${{ steps.buildah-build.outputs.tags }} ; do
@@ -77,7 +78,7 @@ jobs:
         done
         tags_json=$(jq --compact-output --null-input '$ARGS.positional' --args -- "${{ steps.buildah-build.outputs.tags }}")
         echo $tags_json
-        echo "tags='${tags_json}'" >> $GITHUB_OUTPUT
+        echo "tags=${tags_json}" >> $GITHUB_OUTPUT
 
     - name: Push To Quay
       if: github.ref == 'refs/heads/main' && github.repository == 'bioconda/bioconda-containers'
