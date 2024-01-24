@@ -75,7 +75,7 @@ jobs:
         done
 
     - name: Push To Quay
-      if: github.ref == 'refs/heads/main' && github.repository == 'bioconda/bioconda-containers'
+      # if: github.ref == 'refs/heads/main' && github.repository == 'bioconda/bioconda-containers'
       uses: redhat-actions/push-to-registry@v2
       with:
         image: ${{ steps.buildah-build.outputs.image }}
@@ -86,7 +86,7 @@ jobs:
 
   build-manifest:
     needs: [build]
-    if: github.ref == 'refs/heads/main' && github.repository == 'bioconda/bioconda-containers'
+    # if: github.ref == 'refs/heads/main' && github.repository == 'bioconda/bioconda-containers'
     name: Build and push Docker manifest
     runs-on: ubuntu-22.04
     env:
