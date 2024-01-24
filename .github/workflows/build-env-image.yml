@@ -89,7 +89,7 @@ jobs:
 
   build-manifest:
     needs: [build]
-    # if: github.ref == 'refs/heads/main' && github.repository == 'bioconda/bioconda-containers'
+    if: github.ref == 'refs/heads/main' && github.repository == 'bioconda/bioconda-containers'
     name: Build and push Docker manifest
     runs-on: ubuntu-22.04
     env:
