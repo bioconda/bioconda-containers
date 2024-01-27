@@ -1,4 +1,4 @@
-name: 'Build & Push: base-glibc-busybox-bash'
+name: 'Build & Push: bioconda-utils-build-env-cos7'
 on:
   pull_request:
     paths:
