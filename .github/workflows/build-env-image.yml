@@ -1,12 +1,16 @@
 name: 'Build & Push: bioconda-utils-build-env-cos7'
 on:
-  pull_request:
-    paths:
-    - 'images/build-env/**'
-    - '.github/workflows/build-env-image.yml'
   push:
     branches:
-      - 'main'
+      - main
+    paths:
+    - images/build-env/**
+    - .github/workflows/build-env-image.yml
+  pull_request:
+    paths:
+    - images/build-env/**
+    - .github/workflows/build-env-image.yml
+
 
 jobs:
   build:
