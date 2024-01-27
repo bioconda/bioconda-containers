@@ -11,8 +11,6 @@ on:
     - images/build-env/**
     - .github/workflows/build-env-image.yml
 
-
-
 jobs:
   build:
     name: Build & Push
@@ -29,6 +27,7 @@ jobs:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
+
     - name: Checkout bioconda-utils
       uses: actions/checkout@v4
       with:
