@@ -1,0 +1,4 @@
+ARG base
+FROM "${base}"
+RUN bioconda-utils --version
+RUN bioconda-utils --help
