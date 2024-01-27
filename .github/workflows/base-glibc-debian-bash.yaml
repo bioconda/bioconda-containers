@@ -43,15 +43,19 @@ jobs:
           ${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}
           latest
         '
+        # Adds image and tags to outputs which can be used in later steps.
         printf %s\\n \
           "image=${image_name}" \
           "tags=$( echo ${tags} )" \
           >> $GITHUB_OUTPUT
 
+        # Create manifest (which is considered arch-independent)
         for tag in ${tags} ; do
           buildah manifest create "${image_name}:${tag}"
         done
 
+        # --iidfile prints the built image ID to the specified file. This is
+        # used so we can refer to the image in later steps.
         for arch in amd64 arm64 ; do
           iidfile="$( mktemp )"
           buildah bud \
@@ -61,6 +65,7 @@ jobs:
           image_id="$( cat "${iidfile}" )"
           rm "${iidfile}"
 
+          # Extract various package info and version info to store as labels
           container="$( buildah from "${image_id}" )"
           run() { buildah run "${container}" "${@}" ; }
           deb_list="$( run cat /.deb.lst | tr '\n' '|' | sed 's/|$//' )"
@@ -70,6 +75,7 @@ jobs:
           bash="$( run bash --version | sed '1!d' )"
           buildah rm "${container}"
 
+          # Store package/version info as labels for the image
           container="$( buildah from "${image_id}" )"
           buildah config \
             --label=glibc="${glibc}" \
@@ -79,8 +85,11 @@ jobs:
             --label=pkg-list="${pkg_list}" \
             "${container}"
 
+          # Store the new image (now with labels)
           image_id="$( buildah commit "${container}" )"
           buildah rm "${container}"
+
+          # image tag includes arch; then added to manifest which does not include arch
           for tag in ${tags} ; do
             buildah tag \
               "${image_id}" \
@@ -94,6 +103,8 @@ jobs:
     - name: Test
       run: |
         image='${{ steps.build.outputs.image }}'
+
+        # Extract image ids from manifest to test.
         ids="$(
           for tag in ${{ steps.build.outputs.tags }} ; do
             buildah manifest inspect "${image}:${tag}" \
@@ -104,6 +115,8 @@ jobs:
                 done
           done
           )"
+
+        # See Dockerfile.test for actual tests run
         ids="$( printf %s "${ids}" | sort -u )"
         for id in ${ids} ; do
           podman history "${id}"
@@ -117,7 +130,7 @@ jobs:
     - name: Check Tags
       run: |
         # FIX upstream: Quay.io does not support immutable images currently.
-        #               => Try to use the REST API to check for duplicate tags.
+        #               => Try to use the REST API to check for duplicate tags and exit if they exist
         response="$(
           curl -sL \
             'https://quay.io/api/v1/repository/bioconda/${{ steps.build.outputs.image }}/tag/'
