@@ -79,7 +79,7 @@ jobs:
           buildah bud \
             --arch="${arch}" \
             --iidfile="${iidfile}" \
-            --build-arg=base_image="$base_image" \
+            --build-arg=base_image="$base_image"
           image_id="$( cat "${iidfile}" )"
           rm "${iidfile}"
 
