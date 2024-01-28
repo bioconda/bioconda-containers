@@ -24,12 +24,12 @@ jobs:
 
     steps:
     - name: Checkout bioconda-containers
-    - uses: actions/checkout@v4
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
     - name: Checkout bioconda-utils
-    - uses: actions/checkout@v4
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
         repository: 'bioconda/bioconda-utils'
