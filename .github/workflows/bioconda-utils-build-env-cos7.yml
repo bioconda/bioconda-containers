@@ -198,7 +198,7 @@ jobs:
       with:
         image: ${{ steps.build.outputs.image_name }}
         tags: ${{ steps.build.outputs.tags }}
-        registry: ${{ secrets.QUAY_BIOCONDA_REPO }}
+        registry: quay.io/bioconda
         username: ${{ secrets.QUAY_BIOCONDA_USERNAME }}
         password: ${{ secrets.QUAY_BIOCONDA_TOKEN }}
 
