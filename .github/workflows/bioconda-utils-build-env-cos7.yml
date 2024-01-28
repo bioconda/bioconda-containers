@@ -162,6 +162,13 @@ jobs:
             'https://quay.io/api/v1/repository/bioconda/${{ steps.build.outputs.image_name }}/tag/'
           )"
 
+        # This might be the first time making this image (e.g., will likely
+        # happen when using a test prefix), in which case there will be no
+        # available images.
+        if [ -z "${response}" ]; then
+          exit 0
+        ]
+
         existing_tags="$(
           printf %s "${response}" \
             | jq -r '.tags[]|select(.end_ts == null or .end_ts >= now)|.name'
