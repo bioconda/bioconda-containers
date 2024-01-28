@@ -167,7 +167,7 @@ jobs:
         # available images.
         if [ -z "${response}" ]; then
           exit 0
-        ]
+        fi
 
         existing_tags="$(
           printf %s "${response}" \
