@@ -2,7 +2,7 @@ name: 'Build & Push: bioconda-utils-build-env-cos7'
 on:
   push:
     branches:
-    - main
+    - test-push
     paths:
     - images/bioconda-utils-build-env-cos7/**
     - .github/workflows/bioconda-utils-build-env-cos7.yml
@@ -177,7 +177,7 @@ jobs:
           esac
         done
 
-    - if: ${{ github.ref == 'refs/heads/main' }}
+    - if: ${{ github.ref == 'refs/heads/test-push' }}
       name: Push
       uses: redhat-actions/push-to-registry@v2
       with:
@@ -187,7 +187,7 @@ jobs:
         username: ${{ secrets.QUAY_BIOCONDA_USERNAME }}
         password: ${{ secrets.QUAY_BIOCONDA_TOKEN }}
 
-    - if: ${{ github.ref == 'refs/heads/main' }}
+    - if: ${{ github.ref == 'refs/heads/test-push' }}
       name: Test Pushed
       run: |
         image='${{ env.IMAGE_NAME }}'
