@@ -1,9 +1,6 @@
-# Specify the base image to support multi-arch images, such as
-# - 'quay.io/condaforge/linux-anvil-aarch64' for Linux aarch64
-# - 'quay.io/condaforge/linux-anvil-cos7-x86_64' for Linux x86_64
-ARG BASE_IMAGE=quay.io/condaforge/linux-anvil-cos7-x86_64
+ARG base_image
 
-FROM ${BASE_IMAGE} as base
+FROM ${base_image} as base
 
 # Copy over C.UTF-8 locale from our base image to make it consistently available during build.
 COPY --from=quay.io/bioconda/base-glibc-busybox-bash /usr/lib/locale/C.utf8 /usr/lib/locale/C.utf8
