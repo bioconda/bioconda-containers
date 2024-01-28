@@ -4,12 +4,12 @@ on:
     branches:
     - main
     paths:
-    - images/build-env/**
-    - .github/workflows/build-env-image.yml
+    - images/bioconda-utils-build-env-cos7/**
+    - .github/workflows/bioconda-utils-build-env-cos7.yml
   pull_request:
     paths:
-    - images/build-env/**
-    - .github/workflows/build-env-image.yml
+    - images/bioconda-utils-build-env-cos7/**
+    - .github/workflows/bioconda-utils-build-env-cos7.yml
 
 jobs:
   build:
