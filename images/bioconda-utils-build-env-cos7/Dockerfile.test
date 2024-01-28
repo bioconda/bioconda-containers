@@ -1,4 +1,6 @@
 ARG base
 FROM "${base}"
-RUN bioconda-utils --version
-RUN bioconda-utils --help
+RUN . /opt/conda/etc/profile.d/conda.sh \
+  && conda activate base \
+  && bioconda-utils --version \
+  && bioconda-utils --help
