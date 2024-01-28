@@ -90,7 +90,7 @@ jobs:
           pkg_list="$( run cat /.pkg.lst | tr '\n' '|' | sed 's/|$//' )"
           glibc="$( run sh -c 'exec "$( find -xdev -name libc.so.6 -print -quit )"' | sed '1!d' )"
           bash="$( run bash --version | sed '1!d' )"
-          bioconda_utils="$( run bioconda-utils --version )"
+          bioconda_utils="$( run ". /opt/conda/etc/profile.d/conda.sh && conda activate base && bioconda-utils --version" )"
           buildah rm "${container}"
 
           # Store package/version info as labels for the image
