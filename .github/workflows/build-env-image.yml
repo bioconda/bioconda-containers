@@ -70,8 +70,8 @@ jobs:
           "arm64=quay.io/condaforge/linux-anvil-aarch64";
         do
           # Unpack archs and base images
-          arch=$(cut -f1 -d "=" $arch_and_image)
-          base_image=$(cut -f2 -d "=" $arch_and_image)
+          arch=$(echo $arch_and_image | cut -f1 -d "=")
+          base_image=$(echo $arch_and_image | cut -f2 -d "=")
 
           # --iidfile prints the built image ID to the specified file. This is
           # used so we can refer to the image in later steps.
