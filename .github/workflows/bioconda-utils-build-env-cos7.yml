@@ -20,6 +20,10 @@ jobs:
       # version tags or checksum IDs, but not via "latest".
       MAJOR_VERSION: 3
       MINOR_VERSION: 1
+
+      # Used for testing -- set to something like 'tmp-' or 'test-' to prefix
+      # images with this name during testing
+      IMAGE_PREFIX: "tmp-"
       IMAGE_NAME: bioconda-utils-build-env-cos7
 
     steps:
@@ -44,9 +48,9 @@ jobs:
       id: build
       run: |
         set -xeu
-        cd 'images/${{ env.IMAGE_NAME }}'
 
-        image_name='${{ env.IMAGE_NAME }}'
+        image_name='${{ env.IMAGE_PREFIX }}${{ env.IMAGE_NAME }}'
+        image_dir='images/${{ env.IMAGE_NAME }}'
         tags='
           ${{ env.MAJOR_VERSION }}
           ${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}
@@ -54,9 +58,12 @@ jobs:
         '
         # Adds image and tags to outputs which can be used in later steps.
         printf %s\\n \
-          "image=${image_name}" \
+          "image_dir=${image_dir}" \
+          "image_name=${image_name}" \
           "tags=$( echo ${tags} )" \
           >> $GITHUB_OUTPUT
+
+        cd 'images/${{ env.IMAGE_NAME }}'
 
         # Create manifest (which is considered arch-independent)
         for tag in ${tags} ; do
@@ -120,7 +127,8 @@ jobs:
 
     - name: Test
       run: |
-        image='${{ steps.build.outputs.image }}'
+        image_name='${{ steps.build.outputs.image_name }}'
+        image_dir='${{ steps.build.outputs.image_dir }}'
 
         # Extract image ids from manifest to test.
         ids="$(
@@ -141,7 +149,7 @@ jobs:
           buildah bud \
             --build-arg=base="${id}" \
             --file=Dockerfile.test \
-            "images/${image}"
+            "${image_dir}"
         done
         buildah rmi --prune || true
 
@@ -151,7 +159,7 @@ jobs:
         #               => Try to use the REST API to check for duplicate tags and exit if they exist
         response="$(
           curl -sL \
-            'https://quay.io/api/v1/repository/bioconda/${{ steps.build.outputs.image }}/tag/'
+            'https://quay.io/api/v1/repository/bioconda/${{ steps.build.outputs.image_name }}/tag/'
           )"
 
         existing_tags="$(
@@ -181,7 +189,7 @@ jobs:
       name: Push
       uses: redhat-actions/push-to-registry@v2
       with:
-        image: ${{ steps.build.outputs.image }}
+        image: ${{ steps.build.outputs.image_name }}
         tags: ${{ steps.build.outputs.tags }}
         registry: ${{ secrets.QUAY_BIOCONDA_REPO }}
         username: ${{ secrets.QUAY_BIOCONDA_USERNAME }}
@@ -190,10 +198,12 @@ jobs:
     - if: ${{ github.ref == 'refs/heads/test-push' }}
       name: Test Pushed
       run: |
-        image='${{ env.IMAGE_NAME }}'
+
+        image_name='${{ steps.build.outputs.image_name }}'
+        image_dir='${{ steps.build.outputs.image_dir }}'
         ids="$(
           for tag in ${{ steps.build.outputs.tags }} ; do
-            buildah manifest inspect "${image}:${tag}" \
+            buildah manifest inspect "${image_name}:${tag}" \
               | jq -r '.manifests[]|.digest' \
               | while read id ; do
                   buildah images --format '{{.ID}}{{.Digest}}' \
@@ -207,6 +217,6 @@ jobs:
           buildah bud \
             --build-arg=base="${id}" \
             --file=Dockerfile.test \
-            "images/${image}"
+            "${image_dir}"
         done
         buildah rmi --prune || true
