@@ -1,7 +1,6 @@
-
 name: 'Build & Push: bioconda-utils-build-env-cos7'
 on:
-  push:
+  # push:
     # branches:
     # - test-push
     # paths:
