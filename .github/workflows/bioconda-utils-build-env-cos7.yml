@@ -199,8 +199,8 @@ jobs:
         image: ${{ steps.build.outputs.image_name }}
         tags: ${{ steps.build.outputs.tags }}
         registry: quay.io/bioconda
-        username: ${{ secrets.QUAY_BIOCONDA_USERNAME_2024 }}
-        password: ${{ secrets.QUAY_BIOCONDA_TOKEN_2024}}
+        username: ${{ secrets.QUAY_BIOCONDA_USERNAME }}
+        password: ${{ secrets.QUAY_BIOCONDA_TOKEN }}
 
     - if: ${{ github.ref == 'refs/heads/test-push' }}
       name: Test Pushed
