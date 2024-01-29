@@ -2,7 +2,7 @@ name: 'Build & Push: base-glibc-debian-bash'
 on:
   push:
     branches:
-    - main
+    - test-push
     paths:
     - images/base-glibc-debian-bash/*
     - .github/workflows/base-glibc-debian-bash.yaml
@@ -19,15 +19,18 @@ jobs:
       # The base image is not intended to change often and should be used with
       # version tags or checksum IDs, but not via "latest".
       MAJOR_VERSION: 3
-      MINOR_VERSION: 0
-      IMAGE_NAME: base-glibc-debian-bash
+      MINOR_VERSION: 1
       DEBIAN_VERSION: '12.2'
+      # Used for testing -- set to something like 'tmp-' or 'test-' to prefix
+      # images with this name during testing
+      IMAGE_PREFIX: "tmp-"
+      IMAGE_NAME: base-glibc-debian-bash
 
     steps:
     - uses: actions/checkout@v4
 
     - name: Set up QEMU
-      uses: docker/setup-qemu-action@v2
+      uses: docker/setup-qemu-action@v3
       with:
         platforms: arm64
 
@@ -35,23 +38,30 @@ jobs:
       id: build
       run: |
         set -xeu
-        cd 'images/${{ env.IMAGE_NAME }}'
 
-        image_name='${{ env.IMAGE_NAME }}'
+        image_name='${{ env.IMAGE_PREFIX }}${{ env.IMAGE_NAME }}'
+        image_dir='images/${{ env.IMAGE_NAME }}'
         tags='
           ${{ env.MAJOR_VERSION }}
           ${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}
           latest
         '
+        # Adds image and tags to outputs which can be used in later steps.
         printf %s\\n \
-          "image=${image_name}" \
+          "image_dir=${image_dir}" \
+          "image_name=${image_name}" \
           "tags=$( echo ${tags} )" \
           >> $GITHUB_OUTPUT
 
+        cd 'images/${{ env.IMAGE_NAME }}'
+
+        # Create manifest (which is considered arch-independent)
         for tag in ${tags} ; do
           buildah manifest create "${image_name}:${tag}"
         done
 
+        # --iidfile prints the built image ID to the specified file. This is
+        # used so we can refer to the image in later steps.
         for arch in amd64 arm64 ; do
           iidfile="$( mktemp )"
           buildah bud \
@@ -61,6 +71,7 @@ jobs:
           image_id="$( cat "${iidfile}" )"
           rm "${iidfile}"
 
+          # Extract various package info and version info to store as labels
           container="$( buildah from "${image_id}" )"
           run() { buildah run "${container}" "${@}" ; }
           deb_list="$( run cat /.deb.lst | tr '\n' '|' | sed 's/|$//' )"
@@ -70,6 +81,7 @@ jobs:
           bash="$( run bash --version | sed '1!d' )"
           buildah rm "${container}"
 
+          # Store package/version info as labels for the image
           container="$( buildah from "${image_id}" )"
           buildah config \
             --label=glibc="${glibc}" \
@@ -79,8 +91,11 @@ jobs:
             --label=pkg-list="${pkg_list}" \
             "${container}"
 
+          # Store the new image (now with labels)
           image_id="$( buildah commit "${container}" )"
           buildah rm "${container}"
+
+          # image tag includes arch; then added to manifest which does not include arch
           for tag in ${tags} ; do
             buildah tag \
               "${image_id}" \
@@ -93,7 +108,10 @@ jobs:
 
     - name: Test
       run: |
-        image='${{ steps.build.outputs.image }}'
+        image_name='${{ steps.build.outputs.image_name }}'
+        image_dir='${{ steps.build.outputs.image_dir }}'
+
+        # Extract image ids from manifest to test.
         ids="$(
           for tag in ${{ steps.build.outputs.tags }} ; do
             buildah manifest inspect "${image}:${tag}" \
@@ -104,24 +122,33 @@ jobs:
                 done
           done
           )"
+
+        # See Dockerfile.test for actual tests run
         ids="$( printf %s "${ids}" | sort -u )"
         for id in ${ids} ; do
           podman history "${id}"
           buildah bud \
             --build-arg=base="${id}" \
             --file=Dockerfile.test \
-            "images/${image}"
+            "${image_dir}"
         done
         buildah rmi --prune || true
 
     - name: Check Tags
       run: |
         # FIX upstream: Quay.io does not support immutable images currently.
-        #               => Try to use the REST API to check for duplicate tags.
+        #               => Try to use the REST API to check for duplicate tags and exit if they exist
         response="$(
           curl -sL \
-            'https://quay.io/api/v1/repository/bioconda/${{ steps.build.outputs.image }}/tag/'
+            'https://quay.io/api/v1/repository/bioconda/${{ steps.build.outputs.image_name }}/tag/'
           )"
+
+        # This might be the first time making this image (e.g., will likely
+        # happen when using a test prefix), in which case there will be no
+        # available images.
+        if [ "$(echo "${response}" | jq -r '.error_message')" == "Requires authentication" ]; then
+          exit 0
+        fi
 
         existing_tags="$(
           printf %s "${response}" \
@@ -146,23 +173,25 @@ jobs:
           esac
         done
 
-    - if: ${{ github.ref == 'refs/heads/main' }}
+    - if: ${{ github.ref == 'refs/heads/test-push' }}
       name: Push
       uses: redhat-actions/push-to-registry@v2
       with:
-        image: ${{ steps.build.outputs.image }}
+        image: ${{ steps.build.outputs.image_name }}
         tags: ${{ steps.build.outputs.tags }}
-        registry: ${{ secrets.QUAY_BIOCONDA_REPO }}
+        registry: quay.io/bioconda
         username: ${{ secrets.QUAY_BIOCONDA_USERNAME }}
         password: ${{ secrets.QUAY_BIOCONDA_TOKEN }}
 
-    - if: ${{ github.ref == 'refs/heads/main' }}
+    - if: ${{ github.ref == 'refs/heads/test-push' }}
       name: Test Pushed
       run: |
-        image='${{ env.IMAGE_NAME }}'
+
+        image_name='${{ steps.build.outputs.image_name }}'
+        image_dir='${{ steps.build.outputs.image_dir }}'
         ids="$(
           for tag in ${{ steps.build.outputs.tags }} ; do
-            buildah manifest inspect "${image}:${tag}" \
+            buildah manifest inspect "${image_name}:${tag}" \
               | jq -r '.manifests[]|.digest' \
               | while read id ; do
                   buildah images --format '{{.ID}}{{.Digest}}' \
@@ -176,6 +205,6 @@ jobs:
           buildah bud \
             --build-arg=base="${id}" \
             --file=Dockerfile.test \
-            "images/${image}"
+            "${image_dir}"
         done
         buildah rmi --prune || true

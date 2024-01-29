@@ -1,15 +1,15 @@
-name: 'Build & Push: base-glibc-busybox-bash'
+name: 'Build & Push: bioconda-utils-build-env-cos7'
 on:
   push:
     branches:
-    - main
+    - test-push
     paths:
-    - images/base-glibc-busybox-bash/*
-    - .github/workflows/base-glibc-busybox-bash.yaml
+    - images/bioconda-utils-build-env-cos7/**
+    - .github/workflows/bioconda-utils-build-env-cos7.yml
   pull_request:
     paths:
-    - images/base-glibc-busybox-bash/*
-    - .github/workflows/base-glibc-busybox-bash.yaml
+    - images/bioconda-utils-build-env-cos7/**
+    - .github/workflows/bioconda-utils-build-env-cos7.yml
 
 jobs:
   build:
@@ -20,15 +20,24 @@ jobs:
       # version tags or checksum IDs, but not via "latest".
       MAJOR_VERSION: 3
       MINOR_VERSION: 1
-      BUSYBOX_VERSION: '1.36.1'
-      DEBIAN_VERSION: '12.2'
+
       # Used for testing -- set to something like 'tmp-' or 'test-' to prefix
       # images with this name during testing
       IMAGE_PREFIX: "tmp-"
-      IMAGE_NAME: base-glibc-busybox-bash
+      IMAGE_NAME: bioconda-utils-build-env-cos7
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout bioconda-containers
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Checkout bioconda-utils
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        repository: 'bioconda/bioconda-utils'
+        path: 'images/bioconda-utils-build-env-cos7/bioconda-utils'
 
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
@@ -61,23 +70,23 @@ jobs:
           buildah manifest create "${image_name}:${tag}"
         done
 
-        # --iidfile prints the built image ID to the specified file. This is
-        # used so we can refer to the image in later steps.
-        iidfile="$( mktemp )"
-        buildah bud \
-          --iidfile="${iidfile}" \
-          --build-arg=busybox_version='${{ env.BUSYBOX_VERSION }}' \
-          --file=Dockerfile.busybox
-        busybox_image="$( cat "${iidfile}" )"
-        rm "${iidfile}"
+        # Due to different nomenclature used by conda-forge and buildah, we
+        # need to map archs to base images.
+        for arch_and_image in \
+          "amd64=quay.io/condaforge/linux-anvil-cos7-x86_64" \
+          "arm64=quay.io/condaforge/linux-anvil-aarch64";
+        do
+          # Unpack archs and base images
+          arch=$(echo $arch_and_image | cut -f1 -d "=")
+          base_image=$(echo $arch_and_image | cut -f2 -d "=")
 
-        for arch in amd64 arm64 ; do
+          # --iidfile prints the built image ID to the specified file. This is
+          # used so we can refer to the image in later steps.
           iidfile="$( mktemp )"
           buildah bud \
             --arch="${arch}" \
             --iidfile="${iidfile}" \
-            --build-arg=busybox_image="${busybox_image}" \
-            --build-arg=debian_version='${{ env.DEBIAN_VERSION }}'
+            --build-arg=base_image="$base_image"
           image_id="$( cat "${iidfile}" )"
           rm "${iidfile}"
 
@@ -87,18 +96,18 @@ jobs:
           deb_list="$( run cat /.deb.lst | tr '\n' '|' | sed 's/|$//' )"
           pkg_list="$( run cat /.pkg.lst | tr '\n' '|' | sed 's/|$//' )"
           glibc="$( run sh -c 'exec "$( find -xdev -name libc.so.6 -print -quit )"' | sed '1!d' )"
-          busybox="$( run busybox | sed '1!d' )"
           bash="$( run bash --version | sed '1!d' )"
+          bioconda_utils="$( run sh -c '. /opt/conda/etc/profile.d/conda.sh && conda activate base && bioconda-utils --version' | rev | cut -f1 -d " " | rev )"
           buildah rm "${container}"
 
           # Store package/version info as labels for the image
           container="$( buildah from "${image_id}" )"
           buildah config \
             --label=glibc="${glibc}" \
-            --label=busybox="${busybox}" \
             --label=bash="${bash}" \
             --label=deb-list="${deb_list}" \
             --label=pkg-list="${pkg_list}" \
+            --label=bioconda-utils="${bioconda_utils}" \
             "${container}"
 
           # Store the new image (now with labels)
