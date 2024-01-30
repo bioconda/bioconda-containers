@@ -7,14 +7,14 @@ on:
       tags:
         required: true
         type: string
-      busybox_version:
-        required: false
-        type: string
-      debian_version:
+      build_args:
         required: false
         type: string
       image_prefix:
         required: false
+        type: string
+      archs:  # space-separated list of architectures, e.g., "arm64 amd64"
+        required: true
         type: string
 
 jobs:
@@ -39,11 +39,8 @@ jobs:
         image_name='${{ inputs.image_name }}${{ inputs.image_prefix }}'
         image_dir='images/${{ inputs.image_name }}'
         tags='${{ inputs.tags }}'
-        debian_version='${{ inputs.debian_version }}'
-        busybox_version='${{ inputs.busybox_version }}'
-
-        # FIXME: just used for testing to see if we get default values
-        echo "Busybox: $busybox_version"
+        archs='${{ inputs.archs }}'
+        build_args='${{ inputs.build_args }}'
 
         # Adds image and tags to outputs which can be used in later steps.
         printf %s\\n \
@@ -52,24 +49,22 @@ jobs:
           "tags=$( echo ${tags} )" \
           >> $GITHUB_OUTPUT
 
+        # Dockerfile lives here
         cd $image_dir
+
         for tag in ${tags} ; do
           buildah manifest create "${image_name}:${tag}"
         done
 
-        BUILD_ARGS=""
-        if [ ! -z "${debian_version}" ]; then
-          BUILD_ARGS="--build-arg=debian_version=$debian_version"
-        fi
 
         # --iidfile prints the built image ID to the specified file. This is
         # used so we can refer to the image in later steps.
-        for arch in amd64 arm64 ; do
+        for arch in $archs ; do
           iidfile="$( mktemp )"
           buildah bud \
             --arch="${arch}" \
             --iidfile="${iidfile}" \
-            $BUILD_ARGS
+            $build_args
           image_id="$( cat "${iidfile}" )"
           rm "${iidfile}"
 
@@ -111,10 +106,12 @@ jobs:
     - name: Test
       run: |
         set -xeu
-        image_name='${{ inputs.image_name }}'
-        image_dir='${{ inputs.image_dir }}'
 
-        # Extract image ids from manifest to test.
+        # Store inputs as local variables
+        image_name='${{ inputs.image_name }}'
+        image_dir="images/${image_name}"
+
+        # Extract image IDs from the manifest built in the last step
         ids="$(
           for tag in ${{ inputs.tags }} ; do
             buildah manifest inspect "${image_name}:${tag}" \
@@ -126,7 +123,8 @@ jobs:
           done
           )"
 
-        # See Dockerfile.test for actual tests run
+        # Run the tests; see Dockerfile.test in the relevant image dir for the
+        # actual tests run
         ids="$( printf %s "${ids}" | sort -u )"
         for id in ${ids} ; do
           podman history "${id}"
