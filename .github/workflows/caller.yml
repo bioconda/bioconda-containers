@@ -5,11 +5,14 @@ on:
     - .github/workflows/caller.yml
 
 jobs:
-  call-generic-build:
-    env:
-      image_name: example-image
+  build-image-1:
     uses: bioconda/bioconda-containers/.github/workflows/generic_build.yml@reusable-workflow-testing
     with:
-      image_name: ${{ env.image_name }}
+      image_name: image-1
       tags: 'major.minor latest'
 
+build-image-2:
+    uses: bioconda/bioconda-containers/.github/workflows/generic_build.yml@reusable-workflow-testing
+    with:
+      image_name: image-2
+      tags: 'major.minor latest'
