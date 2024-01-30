@@ -13,7 +13,7 @@ jobs:
       debian_version: '12.2'
       archs: 'arm64'
 
-  base-glibc-debian-bash:
+  base-glibc-busybox-bash:
     uses: bioconda/bioconda-containers/.github/workflows/generic_build.yml@reusable-workflow-testing
     with:
       image_name: base-glibc-busybox-bash
