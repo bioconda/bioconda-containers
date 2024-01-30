@@ -4,9 +4,6 @@ on:
       image_name:
         required: true
         type: string
-      image_dir:
-        required: true
-        type: string
       tags:
         required: true
         type: string
@@ -37,4 +34,4 @@ jobs:
       set -xeu
       image_name='${{ inputs.image_name }}${{ inputs.image_prefix }}'
       image_dir='images/${{ inputs.image_name }}'
-
+      

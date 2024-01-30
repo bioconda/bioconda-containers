@@ -1,6 +1,8 @@
 name: "Generic caller test"
 on:
   pull_request:
+    paths:
+    - .github/workflows/caller.yml
 
 jobs:
   call-generic-build:
