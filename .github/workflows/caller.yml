@@ -6,7 +6,7 @@ on:
 
 jobs:
   call-generic-build:
-    uses: bioconda/bioconda-containers/.github/workflows/generic_build.yml
+    uses: bioconda/bioconda-containers/.github/workflows/generic_build.yml@reusable-workflow-testing
     with:
       image_name: example-image
       tags: 'major.minor latest'
