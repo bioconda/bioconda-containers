@@ -34,12 +34,16 @@ jobs:
       id: build
       run: |
         set -xeu
+
+        # Store provided inputs as local vars
         image_name='${{ inputs.image_name }}${{ inputs.image_prefix }}'
         image_dir='images/${{ inputs.image_name }}'
         tags='${{ inputs.tags }}'
-        echo $image_name
-        echo $image_dir
-        echo $tags
+        debian_version='${{ inputs.debian_version }}'
+        busybox_version='${{ inputs.busybox_version }}'
+
+        # FIXME: just used for testing to see if we get default values
+        echo "Busybox: $busybox_version"
 
         # Adds image and tags to outputs which can be used in later steps.
         printf %s\\n \
@@ -52,12 +56,10 @@ jobs:
         for tag in ${tags} ; do
           buildah manifest create "${image_name}:${tag}"
         done
-        debian_version='${{ inputs.debian_version }}'
-        busybox_version='${{ inputs.busybox_version }}'
-        echo "Busybox: $busybox_version"
+
         BUILD_ARGS=""
         if [ ! -z "${debian_version}" ]; then
-          BUILD_ARGS="--build=$debian_version"
+          BUILD_ARGS="--build-arg=debian_version=$debian_version"
         fi
 
         # --iidfile prints the built image ID to the specified file. This is
