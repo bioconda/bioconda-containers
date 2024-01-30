@@ -37,6 +37,7 @@ jobs:
         image_name='${{ inputs.image_name }}${{ inputs.image_prefix }}'
         image_dir='images/${{ inputs.image_name }}'
         tags='${{ inputs.tags }}'
+        debian_version='${{ inputs.debian_version }}'
         echo $image_name
         echo $image_dir
         echo $tags
@@ -98,3 +99,4 @@ jobs:
               "${image_id}"
           done
         done
+
