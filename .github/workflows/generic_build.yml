@@ -52,9 +52,13 @@ jobs:
         for tag in ${tags} ; do
           buildah manifest create "${image_name}:${tag}"
         done
-
-        if '${{ inputs.debian_version }}'; then
-          BUILD_ARGS="--build"'${{ inputs_debian_version }}'
+        debian_version='${{ inputs.debian_version }}'
+        busybox_version='${{ inputs.busybox_version }}'
+        echo "Busybox: $busybox_version"
+        BUILD_ARGS=""
+        if [ ! -z "${debian_version}" ]; then
+          BUILD_ARGS="--build=$debian_version"
+        fi
 
         # --iidfile prints the built image ID to the specified file. This is
         # used so we can refer to the image in later steps.
@@ -63,7 +67,7 @@ jobs:
           buildah bud \
             --arch="${arch}" \
             --iidfile="${iidfile}" \
-            --build-arg=debian_version='${{ inputs.debian_version }}'
+            $BUILD_ARGS
           image_id="$( cat "${iidfile}" )"
           rm "${iidfile}"
 
