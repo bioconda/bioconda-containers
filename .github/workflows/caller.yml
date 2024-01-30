@@ -5,14 +5,9 @@ on:
     - .github/workflows/caller.yml
 
 jobs:
-  build-image-1:
+  create-env:
     uses: bioconda/bioconda-containers/.github/workflows/generic_build.yml@reusable-workflow-testing
     with:
-      image_name: image-1
-      tags: 'major.minor latest'
-
-  build-image-2:
-    uses: bioconda/bioconda-containers/.github/workflows/generic_build.yml@reusable-workflow-testing
-    with:
-      image_name: image-2
-      tags: 'major.minor latest'
+      image_name: base-glibc-debian-bash
+      tags: '3.1 3 latest'
+      debian_version: '12.2'

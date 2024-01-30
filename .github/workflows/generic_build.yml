@@ -36,6 +36,31 @@ jobs:
         set -xeu
         image_name='${{ inputs.image_name }}${{ inputs.image_prefix }}'
         image_dir='images/${{ inputs.image_name }}'
+        tags='${{ inputs.tags }}'
         echo $image_name
         echo $image_dir
+        echo $tags
+
+        # Adds image and tags to outputs which can be used in later steps.
+        printf %s\\n \
+          "image_dir=${image_dir}" \
+          "image_name=${image_name}" \
+          "tags=$( echo ${tags} )" \
+          >> $GITHUB_OUTPUT
+
+        cd $image_dir
+        for tag in ${tags} ; do
+          buildah manifest create "${image_name}:${tag}"
+        done
+
+        # --iidfile prints the built image ID to the specified file. This is
+        # used so we can refer to the image in later steps.
+        for arch in amd64 arm64 ; do
+          iidfile="$( mktemp )"
+          buildah bud \
+            --arch="${arch}" \
+            --iidfile="${iidfile}" \
+            --build-arg=debian_version='${{ env.DEBIAN_VERSION }}'
+          image_id="$( cat "${iidfile}" )"
+          rm "${iidfile}"
 
