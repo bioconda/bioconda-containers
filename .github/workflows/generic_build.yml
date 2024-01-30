@@ -64,3 +64,37 @@ jobs:
           image_id="$( cat "${iidfile}" )"
           rm "${iidfile}"
 
+          # Extract various package info and version info to store as labels
+          container="$( buildah from "${image_id}" )"
+          run() { buildah run "${container}" "${@}" ; }
+          deb_list="$( run cat /.deb.lst | tr '\n' '|' | sed 's/|$//' )"
+          pkg_list="$( run cat /.pkg.lst | tr '\n' '|' | sed 's/|$//' )"
+          glibc="$( run sh -c 'exec "$( find -xdev -name libc.so.6 -print -quit )"' | sed '1!d' )"
+          debian="$( run cat /etc/debian_version | sed '1!d' )"
+          bash="$( run bash --version | sed '1!d' )"
+          buildah rm "${container}"
+
+          # Store package/version info as labels for the image
+          container="$( buildah from "${image_id}" )"
+          buildah config \
+            --label=glibc="${glibc}" \
+            --label=debian="${debian}" \
+            --label=bash="${bash}" \
+            --label=deb-list="${deb_list}" \
+            --label=pkg-list="${pkg_list}" \
+            "${container}"
+
+          # Store the new image (now with labels)
+          image_id="$( buildah commit "${container}" )"
+          buildah rm "${container}"
+
+          # image tag includes arch; then added to manifest which does not include arch
+          for tag in ${tags} ; do
+            buildah tag \
+              "${image_id}" \
+              "${image_name}:${tag}-${arch}"
+            buildah manifest add \
+              "${image_name}:${tag}" \
+              "${image_id}"
+          done
+        done
