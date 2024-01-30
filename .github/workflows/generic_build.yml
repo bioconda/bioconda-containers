@@ -37,7 +37,6 @@ jobs:
         image_name='${{ inputs.image_name }}${{ inputs.image_prefix }}'
         image_dir='images/${{ inputs.image_name }}'
         tags='${{ inputs.tags }}'
-        debian_version='${{ inputs.debian_version }}'
         echo $image_name
         echo $image_dir
         echo $tags
@@ -61,7 +60,7 @@ jobs:
           buildah bud \
             --arch="${arch}" \
             --iidfile="${iidfile}" \
-            --build-arg=debian_version='${{ env.DEBIAN_VERSION }}'
+            --build-arg=debian_version='${{ inputs.debian_version }}'
           image_id="$( cat "${iidfile}" )"
           rm "${iidfile}"
 
@@ -100,3 +99,30 @@ jobs:
           done
         done
 
+    - name: Test
+      run: |
+        image_name='${{ inputs.image_name }}'
+        image_dir='${{ inputs.image_dir }}'
+
+        # Extract image ids from manifest to test.
+        ids="$(
+          for tag in ${{ inputs.tags }} ; do
+            buildah manifest inspect "${image}:${tag}" \
+              | jq -r '.manifests[]|.digest' \
+              | while read id ; do
+                  buildah images --format '{{.ID}}{{.Digest}}' \
+                  | sed -n "s/${id}//p"
+                done
+          done
+          )"
+
+        # See Dockerfile.test for actual tests run
+        ids="$( printf %s "${ids}" | sort -u )"
+        for id in ${ids} ; do
+          podman history "${id}"
+          buildah bud \
+            --build-arg=base="${id}" \
+            --file=Dockerfile.test \
+            "${image_dir}"
+        done
+        buildah rmi --prune || true
