@@ -53,6 +53,9 @@ jobs:
           buildah manifest create "${image_name}:${tag}"
         done
 
+        if '${{ inputs.debian_version }}'; then
+          BUILD_ARGS="--build"'${{ inputs_debian_version }}'
+
         # --iidfile prints the built image ID to the specified file. This is
         # used so we can refer to the image in later steps.
         for arch in amd64 arm64 ; do
@@ -101,13 +104,14 @@ jobs:
 
     - name: Test
       run: |
+        set -xeu
         image_name='${{ inputs.image_name }}'
         image_dir='${{ inputs.image_dir }}'
 
         # Extract image ids from manifest to test.
         ids="$(
           for tag in ${{ inputs.tags }} ; do
-            buildah manifest inspect "${image}:${tag}" \
+            buildah manifest inspect "${image_name}:${tag}" \
               | jq -r '.manifests[]|.digest' \
               | while read id ; do
                   buildah images --format '{{.ID}}{{.Digest}}' \
