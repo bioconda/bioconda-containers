@@ -1,0 +1,11 @@
+name: "Generic caller test"
+on:
+  pull_request:
+
+jobs:
+  call-generic-build:
+    uses: bioconda/bioconda-containers/.github/workflows/generic_build.yml
+    with:
+      image_name: example-image
+      tags: 'major.minor latest'
+

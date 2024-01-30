@@ -1,0 +1,40 @@
+on:
+  workflow_call:
+    inputs:
+      image_name:
+        required: true
+        type: string
+      image_dir:
+        required: true
+        type: string
+      tags:
+        required: true
+        type: string
+      busybox_version:
+        required: false
+        type: string
+      debian_version:
+        required: false
+        type: string
+      image_prefix:
+        required: false
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+  steps:
+  - uses: actions/checkout@v4
+  
+  - name: Set up QEMU
+    uses: docker/setup-qemu-action@v3
+    with:
+      platforms: arm64
+
+  - name: Build
+    id: build
+    run: |
+      set -xeu
+      image_name='${{ inputs.image_name }}${{ inputs.image_prefix }}'
+      image_dir='images/${{ inputs.image_name }}'
+
