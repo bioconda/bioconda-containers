@@ -7,7 +7,10 @@ on:
       tags:
         required: true
         type: string
-      build_args:
+      busybox_version:
+        required: false
+        type: string
+      debian_version:
         required: false
         type: string
       image_prefix:
@@ -39,8 +42,9 @@ jobs:
         image_name='${{ inputs.image_name }}${{ inputs.image_prefix }}'
         image_dir='images/${{ inputs.image_name }}'
         tags='${{ inputs.tags }}'
+        debian_version='${{ inputs.debian_version }}'
+        busybox_version='${{ inputs.busybox_version }}'
         archs='${{ inputs.archs }}'
-        build_args='${{ inputs.build_args }}'
 
         # Adds image and tags to outputs which can be used in later steps.
         printf %s\\n \
@@ -56,15 +60,37 @@ jobs:
           buildah manifest create "${image_name}:${tag}"
         done
 
+        # Incrementally compose build args. Using this 
+        BUILD_ARGS=""
+        if [ ! -z "${debian_version}" ]; then
+          BUILD_ARGS=$(echo $BUILD_ARGS "--build-arg=debian_version=$debian_version")
+        fi
 
-        # --iidfile prints the built image ID to the specified file. This is
-        # used so we can refer to the image in later steps.
+        # If busybox_version was specified, assume we are making a busybox image.
+        if [ ! -z "${busybox_version}" ]; then
+          BUILD_ARGS=$(echo $BUILD_ARGS "--build-arg=busybox_version=$busybox_version")
+
+          # Make a busybox image that we'll use further below.
+          # --iidfile prints the built image ID to the specified file so we can
+          # refer to the image later
+          iidfile="$( mktemp )"
+          buildah bud \
+            --iidfile="${iidfile}" \
+            --file=Dockerfile.busybox \
+            $BUILD_ARGS
+          busybox_image="$( cat "${iidfile}" )"
+          rm "${iidfile}"
+
+          # And then extend the build args with this image.
+          BUILD_ARGS=$(echo $BUILD_ARGS "--build-arg=busybox_image=${busybox_image}")
+        fi
+
         for arch in $archs ; do
           iidfile="$( mktemp )"
           buildah bud \
             --arch="${arch}" \
             --iidfile="${iidfile}" \
-            $build_args
+            $BUILD_ARGS
           image_id="$( cat "${iidfile}" )"
           rm "${iidfile}"
 
