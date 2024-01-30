@@ -19,19 +19,21 @@ on:
 
 jobs:
   build:
+    name: building
     runs-on: ubuntu-22.04
-  steps:
-  - uses: actions/checkout@v4
-  
-  - name: Set up QEMU
-    uses: docker/setup-qemu-action@v3
-    with:
-      platforms: arm64
 
-  - name: Build
-    id: build
-    run: |
-      set -xeu
-      image_name='${{ inputs.image_name }}${{ inputs.image_prefix }}'
-      image_dir='images/${{ inputs.image_name }}'
-      
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: arm64
+
+    - name: Build
+      id: build
+      run: |
+        set -xeu
+        image_name='${{ inputs.image_name }}${{ inputs.image_prefix }}'
+        image_dir='images/${{ inputs.image_name }}'
+
