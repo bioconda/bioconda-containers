@@ -36,4 +36,6 @@ jobs:
         set -xeu
         image_name='${{ inputs.image_name }}${{ inputs.image_prefix }}'
         image_dir='images/${{ inputs.image_name }}'
+        echo $image_name
+        echo $image_dir
 
