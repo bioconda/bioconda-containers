@@ -76,9 +76,9 @@ jobs:
         # ----------------------------------------------------------------------
         # Incrementally compose build args, depending on which inputs were
         # provided.
-        BUILD_ARGS=""
+        BUILD_ARGS=()
         if [ ! -z "${debian_version}" ]; then
-          BUILD_ARGS+="--build-arg=debian_version=$debian_version"
+          BUILD_ARGS+=("--build-arg=debian_version=$debian_version")
         fi
 
         if [ ! -z "${bioconda_utils}" ]; then
@@ -92,7 +92,7 @@ jobs:
 
         # If busybox_version was specified, assume we are making a busybox image.
         if [ ! -z "${busybox_version}" ]; then
-          BUILD_ARGS+="--build-arg=busybox_version=$busybox_version"
+          BUILD_ARGS+=("--build-arg=busybox_version=$busybox_version")
 
           # Make a busybox image that we'll use further below. As shown in the
           # Dockerfile.busybox, this uses the build-busybox script which in turn
@@ -104,12 +104,12 @@ jobs:
           buildah bud \
             --iidfile="${iidfile}" \
             --file=Dockerfile.busybox \
-            $BUILD_ARGS
+            ${BUILD_ARGS[@]}
           busybox_image="$( cat "${iidfile}" )"
           rm "${iidfile}"
 
           # And then extend the build args with this image.
-          BUILD_ARGS+="--build-arg=busybox_image=${busybox_image}"
+          BUILD_ARGS+=("--build-arg=busybox_image=${busybox_image}")
         fi
 
         # ----------------------------------------------------------------------
@@ -127,7 +127,7 @@ jobs:
           buildah bud \
             --arch="${arch}" \
             --iidfile="${iidfile}" \
-            $BUILD_ARGS \
+            ${BUILD_ARGS[@]} \
             $BASE_IMAGE_BUILD_ARG
           image_id="$( cat "${iidfile}" )"
           rm "${iidfile}"
