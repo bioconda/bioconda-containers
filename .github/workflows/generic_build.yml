@@ -84,10 +84,10 @@ jobs:
         if [ ! -z "${bioconda_utils}" ]; then
         # Due to different nomenclature used by conda-forge and buildah, we
         # need to map archs to base images.
-          archs_and_images='
-            amd64=quay.io/condaforge/linux-anvil-cos7-x86_64
-            arm64=quay.io/condaforge/linux-anvil-aarch64
-          '
+          archs_and_images=(
+            "amd64=quay.io/condaforge/linux-anvil-cos7-x86_64",
+            "arm64=quay.io/condaforge/linux-anvil-aarch64"
+          )
         fi
 
         # If busybox_version was specified, assume we are making a busybox image.
