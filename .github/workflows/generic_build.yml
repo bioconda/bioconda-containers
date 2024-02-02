@@ -82,7 +82,9 @@ jobs:
           buildah manifest create "${image_name}:${tag}"
         done
 
-        archs_and_images=$archs
+        # get space-separated archs input string into an array
+        read -r -a archs_and_images <<<"$archs"
+
         # ----------------------------------------------------------------------
         # Incrementally compose build args, depending on which inputs were
         # provided.
