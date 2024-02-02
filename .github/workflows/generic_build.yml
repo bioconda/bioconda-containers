@@ -116,8 +116,8 @@ jobs:
 
         # Build each arch's image
         for arch in $archs_and_images ; do
-          arch=$(echo $arch_and_image | cut -f1 -d "=")
-          base_image=$(echo $arch_and_image | cut -f2 -d "=")
+          arch=$(echo $archs_and_images | cut -f1 -d "=")
+          base_image=$(echo $archs_and_images | cut -f2 -d "=")
           BASE_IMAGE_BUILD_ARG=""
           if [ ! -z "$base_image" ]; then
             BASE_IMAGE_BUILD_ARG="--build_arg=base_image="${base_image}""
