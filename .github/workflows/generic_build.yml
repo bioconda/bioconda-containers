@@ -141,7 +141,7 @@ jobs:
           debian="$( run cat /etc/debian_version | sed '1!d' )"
           bash="$( run bash --version | sed '1!d' )"
 
-          if [ ! -z "${bioconda_utils}" ]; then
+          if [ "${bioconda_utils}" ]; then
             bioconda_utils="$(
               run sh -c '. /opt/conda/etc/profile.d/conda.sh && conda activate base && bioconda-utils --version' \
               | rev | cut -f1 -d " " | rev 
