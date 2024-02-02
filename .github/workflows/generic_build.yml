@@ -134,41 +134,37 @@ jobs:
           image_id="$( cat "${iidfile}" )"
           rm "${iidfile}"
 
-          # Extract various package info and version info, then store that info as labels
+          # Extract various package info and version info, then store that info
+          # as labels. Container is removed at the end to avoid e.g. having these
+          # commands in the history of the container.
           container="$( buildah from "${image_id}" )"
           run() { buildah run "${container}" "${@}" ; }
-          deb_list="$( run cat /.deb.lst | tr '\n' '|' | sed 's/|$//' )"
-          pkg_list="$( run cat /.pkg.lst | tr '\n' '|' | sed 's/|$//' )"
-          glibc="$( run sh -c 'exec "$( find -xdev -name libc.so.6 -print -quit )"' | sed '1!d' )"
-          debian="$( run cat /etc/debian_version | sed '1!d' )"
-          bash="$( run bash --version | sed '1!d' )"
+          LABELS=()
+          LABELS+=("--label=deb-list=\"$( run cat /.deb.lst | tr '\n' '|' | sed 's/|$//' )\"")
+          LABELS+=("--label=pkg-list=\"$( run cat /.pkg.lst | tr '\n' '|' | sed 's/|$//' )\"")
+          LABELS+=("--label=glibc=\"$( run sh -c 'exec "$( find -xdev -name libc.so.6 -print -quit )"' | sed '1!d' )\"")
+          LABELS+=("--label=debian=\"$( run cat /etc/debian_version | sed '1!d' )\"")
+          LABELS+=("--label=bash=\"$( run bash --version | sed '1!d' )\"")
 
           if [ "${bioconda_utils}" ]; then
             bioconda_utils="$(
               run sh -c '. /opt/conda/etc/profile.d/conda.sh && conda activate base && bioconda-utils --version' \
               | rev | cut -f1 -d " " | rev 
             )"
-            buildah config --label=bioconda-utils="${bioconda_utils}" ${container}
+            LABELS+=("--label=\"${bioconda_utils}\"")
           fi
 
           if [ ! -z "${busybox_version}" ]; then
-            buildah config --label=busybox-version="${busybox_version}"
+            LABELS+=("--label=busybox-version=\"${busybox_version}\"")
           fi
           buildah rm "${container}"
 
-          # TODO: use array for labels, and make sure this next container is
-        # the one getting the labels (above, bioconda-utils is added to the
-        # first container which is then rmed)
+          # Add labels to a new container...
           container="$( buildah from "${image_id}" )"
-          buildah config \
-            --label=glibc="${glibc}" \
-            --label=debian="${debian}" \
-            --label=bash="${bash}" \
-            --label=deb-list="${deb_list}" \
-            --label=pkg-list="${pkg_list}" \
-            "${container}"
+          buildah config ${LABELS[@]} "${container}"
 
-          # Store the new image (now with labels)
+          # ...then store the container (now with labels) as a new image. This
+          # is what we'll use to upload.
           image_id="$( buildah commit "${container}" )"
           buildah rm "${container}"
 
