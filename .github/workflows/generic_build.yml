@@ -15,9 +15,11 @@ on:
       busybox_version:
         required: false
         type: string
+
       debian_version:
         required: false
         type: string
+
       image_prefix:
         required: false
         type: string
@@ -50,7 +52,7 @@ jobs:
         set -xeu
 
         # Store provided inputs as local vars
-        image_name='${{ inputs.image_name }}${{ inputs.image_prefix }}'
+        image_name='${{ inputs.image_prefix }}${{ inputs.image_name }}'
         image_dir='images/${{ inputs.image_name }}'
         tags='${{ inputs.tags }}'
         debian_version='${{ inputs.debian_version }}'
@@ -85,7 +87,7 @@ jobs:
         # Due to different nomenclature used by conda-forge and buildah, we
         # need to map archs to base images.
           archs_and_images=(
-            "amd64=quay.io/condaforge/linux-anvil-cos7-x86_64",
+            "amd64=quay.io/condaforge/linux-anvil-cos7-x86_64"
             "arm64=quay.io/condaforge/linux-anvil-aarch64"
           )
         fi
