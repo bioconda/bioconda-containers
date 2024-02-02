@@ -177,10 +177,10 @@ jobs:
               "${image_name}:${tag}" \
               "${image_id}"
 
-            buildah inspect -t image ${image_name}:${tag}
+            # buildah inspect -t image ${image_name}:${tag}
           done
         done
-        buidah_inspect -t manifest ${image_name}
+        # buidah_inspect -t manifest ${image_name}
 
     - name: Test
       run: |
