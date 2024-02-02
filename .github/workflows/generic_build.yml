@@ -122,7 +122,7 @@ jobs:
           base_image=$(echo $archs_and_images | cut -f2 -d "=")
           BASE_IMAGE_BUILD_ARG=""
           if [ ! -z "$base_image" ]; then
-            BASE_IMAGE_BUILD_ARG="--build_arg=base_image="${base_image}""
+            BASE_IMAGE_BUILD_ARG="--build-arg=base_image="${base_image}""
           fi
 
           iidfile="$( mktemp )"
