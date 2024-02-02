@@ -46,6 +46,14 @@ jobs:
       with:
         platforms: arm64
 
+    - name: Checkout bioconda-utils
+      uses: actions/checkout@v4
+      if: '${{ inputs.bioconda_utils }}'
+      with:
+        fetch-depth: 0
+        repository: 'bioconda/bioconda-utils'
+        path: 'images/bioconda-utils-build-env-cos7/bioconda-utils'
+
     - name: Build
       id: build
       run: |
