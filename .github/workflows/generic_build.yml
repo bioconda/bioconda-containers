@@ -154,9 +154,11 @@ jobs:
           if [ ! -z "${busybox_version}" ]; then
             buildah config --label=busybox-version="${busybox_version}"
           fi
-
-
           buildah rm "${container}"
+
+          # TODO: use array for labels, and make sure this next container is
+        # the one getting the labels (above, bioconda-utils is added to the
+        # first container which is then rmed)
           container="$( buildah from "${image_id}" )"
           buildah config \
             --label=glibc="${glibc}" \
@@ -179,10 +181,10 @@ jobs:
               "${image_name}:${tag}" \
               "${image_id}"
 
-            # buildah inspect -t image ${image_name}:${tag}
+            buildah inspect -t image ${image_name}:${tag}
           done
         done
-        # buidah_inspect -t manifest ${image_name}
+        buidah inspect -t manifest ${image_name}
 
     - name: Test
       run: |
