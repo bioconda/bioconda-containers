@@ -91,7 +91,7 @@ jobs:
           BUILD_ARGS+=("--build-arg=debian_version=$debian_version")
         fi
 
-        if [ ! -z "${bioconda_utils}" ]; then
+        if [ "${bioconda_utils}" == "true" ]; then
         # Due to different nomenclature used by conda-forge and buildah, we
         # need to map archs to base images.
           archs_and_images=(
@@ -150,7 +150,13 @@ jobs:
           LABELS=()
           LABELS+=("--label=deb-list=\"$( run cat /.deb.lst | tr '\n' '|' | sed 's/|$//' )\"")
           LABELS+=("--label=pkg-list=\"$( run cat /.pkg.lst | tr '\n' '|' | sed 's/|$//' )\"")
-          LABELS+=("--label=glibc=\"$( run sh -c 'exec "$( find -xdev -name libc.so.6 -print -quit )"' | sed '1!d' )\"")
+          LABELS+=("--label=glibc=\"$( 
+            run sh -c 'exec "$( find -xdev -name libc.so.6 -print -quit )"'
+            | sed '1!d'
+            | sed "s/ /_/g" 
+            | sed "s/\"//g" 
+            | sed "s/\'//g")\""
+          )
           LABELS+=("--label=debian=\"$( run cat /etc/debian_version | sed '1!d' )\"")
           LABELS+=("--label=bash=\"$( run bash --version | sed '1!d' )\"")
 
