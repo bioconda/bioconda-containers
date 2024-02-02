@@ -184,7 +184,7 @@ jobs:
             buildah inspect -t image ${image_name}:${tag}
           done
         done
-        buidah inspect -t manifest ${image_name}
+        buildah inspect -t manifest ${image_name}
 
     - name: Test
       run: |
