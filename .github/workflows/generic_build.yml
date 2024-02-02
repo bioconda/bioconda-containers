@@ -56,6 +56,7 @@ jobs:
         debian_version='${{ inputs.debian_version }}'
         busybox_version='${{ inputs.busybox_version }}'
         archs='${{ inputs.archs }}'
+        bioconda_utils='${{ inputs.bioconda_utils }}'
 
         # Adds image and tags to outputs which can be used in later steps.
         printf %s\\n \
@@ -80,7 +81,7 @@ jobs:
           BUILD_ARGS+="--build-arg=debian_version=$debian_version"
         fi
 
-        if [ '${{ inputs.bioconda_utils }}' ]; then
+        if [ ! -z "${bioconda_utils}" ]; then
         # Due to different nomenclature used by conda-forge and buildah, we
         # need to map archs to base images.
           archs_and_images='
@@ -93,7 +94,10 @@ jobs:
         if [ ! -z "${busybox_version}" ]; then
           BUILD_ARGS+="--build-arg=busybox_version=$busybox_version"
 
-          # Make a busybox image that we'll use further below.
+          # Make a busybox image that we'll use further below. As shown in the
+          # Dockerfile.busybox, this uses the build-busybox script which in turn
+          # cross-compiles for x86_64 and aarch64, and these are later copied
+          # into an arch-specific container.
           # --iidfile prints the built image ID to the specified file so we can
           # refer to the image later
           iidfile="$( mktemp )"
@@ -128,38 +132,37 @@ jobs:
           image_id="$( cat "${iidfile}" )"
           rm "${iidfile}"
 
-          # Extract various package info and version info...
+          # Extract various package info and version info, then store that info as labels
           container="$( buildah from "${image_id}" )"
           run() { buildah run "${container}" "${@}" ; }
-
-          # Incrementally make labels
-
           deb_list="$( run cat /.deb.lst | tr '\n' '|' | sed 's/|$//' )"
-
           pkg_list="$( run cat /.pkg.lst | tr '\n' '|' | sed 's/|$//' )"
           glibc="$( run sh -c 'exec "$( find -xdev -name libc.so.6 -print -quit )"' | sed '1!d' )"
           debian="$( run cat /etc/debian_version | sed '1!d' )"
           bash="$( run bash --version | sed '1!d' )"
 
-          buildah rm "${container}"
-
-          LABELS=""
-          LABELS+="--label=deb-list=${deb_list} "
-          LABELS+="--label=pkg-list=${pkg_list} "
-          LABELS+="--label=glibc=${glibc} "
-          LABELS+="--label=debian=${debian} "
-          LABELS+="--label=bash=${bash} "
-          if [ '${{ inputs.bioconda_utils }}' ]; then
+          if [ ! -z "${bioconda_utils}" ]; then
             bioconda_utils="$(
               run sh -c '. /opt/conda/etc/profile.d/conda.sh && conda activate base && bioconda-utils --version' \
               | rev | cut -f1 -d " " | rev 
             )"
-            LABELS+="--label=bioconda-utils=${bioconda_utils} "
+            buildah config --label=bioconda-utils="${bioconda_utils}" ${container}
           fi
 
-          # ...then store that info as labels for the image
+          if [ ! -z "${busybox_version}" ]; then
+            buildah config --label=busybox-version="${busybox_version}"
+          fi
+
+
+          buildah rm "${container}"
           container="$( buildah from "${image_id}" )"
-          buildah config $LABELS "${container}"
+          buildah config \
+            --label=glibc="${glibc}" \
+            --label=debian="${debian}" \
+            --label=bash="${bash}" \
+            --label=deb-list="${deb_list}" \
+            --label=pkg-list="${pkg_list}" \
+            "${container}"
 
           # Store the new image (now with labels)
           image_id="$( buildah commit "${container}" )"
@@ -173,8 +176,11 @@ jobs:
             buildah manifest add \
               "${image_name}:${tag}" \
               "${image_id}"
+
+            buildah inspect -t image ${image_name}:${tag}
           done
         done
+        buidah_inspect -t manifest ${image_name}
 
     - name: Test
       run: |

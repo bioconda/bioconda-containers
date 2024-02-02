@@ -13,3 +13,4 @@ jobs:
       tags: '3.1 3 latest'
       debian_version: '12.2'
       archs: 'arm64 amd64'
+      bioconda_utils: 'master'
