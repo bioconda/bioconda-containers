@@ -161,7 +161,7 @@ jobs:
               run sh -c '. /opt/conda/etc/profile.d/conda.sh && conda activate base && bioconda-utils --version' \
               | rev | cut -f1 -d " " | rev 
             )"
-            LABELS+=("--label=\"${bioconda_utils}\"")
+            LABELS+=("--label=bioconda-utils=\"${bioconda_utils}\"")
           fi
 
           if [ ! -z "${busybox_version}" ]; then
@@ -171,10 +171,7 @@ jobs:
 
           # Add labels to a new container...
           container="$( buildah from "${image_id}" )"
-
-          # FIXME: can't quite get the quoting right for args in array, so
-          # disabling for now to get other things working.
-          # buildah config ${LABELS[@]} "${container}"
+          buildah config ${LABELS[@]} "${container}"
 
           # ...then store the container (now with labels) as a new image. This
           # is what we'll use to upload.
