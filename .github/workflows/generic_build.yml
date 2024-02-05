@@ -150,34 +150,34 @@ jobs:
           container="$( buildah from "${image_id}" )"
           run() { buildah run "${container}" "${@}" ; }
           LABELS=()
-          LABELS+=("--label=deb-list=\"$( run cat /.deb.lst | tr '\n' '|' | sed 's/|$//' )\"")
-          LABELS+=("--label=pkg-list=\"$( run cat /.pkg.lst | tr '\n' '|' | sed 's/|$//' )\"")
-          LABELS+=("--label=glibc=\"$( run sh -c 'exec "$( find -xdev -name libc.so.6 -print -quit )"' | sed '1!d' )\"")
-          LABELS+=("--label=debian=\"$( run cat /etc/debian_version | sed '1!d' )\"")
-          LABELS+=("--label=bash=\"$( run bash --version | sed '1!d' )\"")
+          LABELS+=("--label=deb-list=$( run cat /.deb.lst | tr '\n' '|' | sed 's/|$//' )")
+          LABELS+=("--label=pkg-list=$( run cat /.pkg.lst | tr '\n' '|' | sed 's/|$//' )")
+          LABELS+=("--label=glibc=$( run sh -c 'exec "$( find -xdev -name libc.so.6 -print -quit )"' | sed '1!d' )")
+          LABELS+=("--label=debian=$( run cat /etc/debian_version | sed '1!d' )")
+          LABELS+=("--label=bash=$( run bash --version | sed '1!d' )")
 
           if [ "${bioconda_utils}" == "true" ]; then
             bioconda_utils="$(
               run sh -c '. /opt/conda/etc/profile.d/conda.sh && conda activate base && bioconda-utils --version' \
               | rev | cut -f1 -d " " | rev 
             )"
-            LABELS+=("--label=bioconda-utils=\"${bioconda_utils}\"")
+            LABELS+=("--label=bioconda-utils=${bioconda_utils}")
           fi
 
           if [ ! -z "${busybox_version}" ]; then
-            LABELS+=("--label=busybox-version=\"${busybox_version}\"")
+            LABELS+=("--label=busybox-version=${busybox_version}")
           fi
           buildah rm "${container}"
 
           # Add labels to a new container...
           container="$( buildah from "${image_id}" )"
 
-          # FIXME: Test out different options
-          declare -a mycmd=( buildah config ${LABELS[@]} "${container}" )
-          echo "Label args: " "${LABELS[@]}"
-          echo "Label args with @Q: " "${LABELS[@]@Q}"
-          echo "Label command: " "${mycmd[@]}"
-          echo "Label command with @Q: " "${mycmd[@]@Q}"
+          # # FIXME: Test out different options
+          # declare -a mycmd=( buildah config ${LABELS[@]} "${container}" )
+          # echo "Label args: " "${LABELS[@]}"
+          # echo "Label args with @Q: " "${LABELS[@]@Q}"
+          # echo "Label command: " "${mycmd[@]}"
+          # echo "Label command with @Q: " "${mycmd[@]@Q}"
 
           buildah config "${LABELS[@]}" "${container}"
 
