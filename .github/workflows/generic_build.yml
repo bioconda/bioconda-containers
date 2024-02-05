@@ -190,7 +190,7 @@ jobs:
               "${image_name}:${tag}" \
               "${image_id}"
 
-            buildah inspect -t image ${image_name}:${tag}
+            buildah inspect -t image ${image_name}:${tag}-${arch}
           done
         done
         buildah inspect -t manifest ${image_name}
