@@ -171,14 +171,6 @@ jobs:
 
           # Add labels to a new container...
           container="$( buildah from "${image_id}" )"
-
-          # # FIXME: Test out different options
-          # declare -a mycmd=( buildah config ${LABELS[@]} "${container}" )
-          # echo "Label args: " "${LABELS[@]}"
-          # echo "Label args with @Q: " "${LABELS[@]@Q}"
-          # echo "Label command: " "${mycmd[@]}"
-          # echo "Label command with @Q: " "${mycmd[@]@Q}"
-
           buildah config "${LABELS[@]}" "${container}"
 
           # ...then store the container (now with labels) as a new image. This
