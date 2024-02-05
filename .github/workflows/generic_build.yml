@@ -152,7 +152,7 @@ jobs:
           LABELS=()
           LABELS+=("--label=deb-list=\"$( run cat /.deb.lst | tr '\n' '|' | sed 's/|$//' )\"")
           LABELS+=("--label=pkg-list=\"$( run cat /.pkg.lst | tr '\n' '|' | sed 's/|$//' )\"")
-          # LABELS+=("--labels=glibc=\"$( run sh -c 'exec "$( find -xdev -name libc.so.6 -print -quit )"' | sed '1!d' )\"")
+          LABELS+=("--labels=glibc=\"$( run sh -c 'exec "$( find -xdev -name libc.so.6 -print -quit )"' | sed '1!d' )\"")
           LABELS+=("--label=debian=\"$( run cat /etc/debian_version | sed '1!d' )\"")
           LABELS+=("--label=bash=\"$( run bash --version | sed '1!d' )\"")
 
@@ -171,7 +171,10 @@ jobs:
 
           # Add labels to a new container...
           container="$( buildah from "${image_id}" )"
-          buildah config ${LABELS[@]} "${container}"
+
+          # FIXME: can't quite get the quoting right for args in array, so
+          # disabling for now to get other things working.
+          # buildah config ${LABELS[@]} "${container}"
 
           # ...then store the container (now with labels) as a new image. This
           # is what we'll use to upload.
