@@ -156,7 +156,7 @@ jobs:
           LABELS+=("--label=debian=\"$( run cat /etc/debian_version | sed '1!d' )\"")
           LABELS+=("--label=bash=\"$( run bash --version | sed '1!d' )\"")
 
-          if [ "${bioconda_utils}" ]; then
+          if [ "${bioconda_utils}" == "true" ]; then
             bioconda_utils="$(
               run sh -c '. /opt/conda/etc/profile.d/conda.sh && conda activate base && bioconda-utils --version' \
               | rev | cut -f1 -d " " | rev 
@@ -171,7 +171,7 @@ jobs:
 
           # Add labels to a new container...
           container="$( buildah from "${image_id}" )"
-          buildah config ${LABELS[@]} "${container}"
+          # buildah config ${LABELS[@]} "${container}"
 
           # ...then store the container (now with labels) as a new image. This
           # is what we'll use to upload.
