@@ -271,7 +271,9 @@ async def upload_artifacts(session: ClientSession, pr: int) -> str:
     sha: str = pr_info["head"]["sha"]
 
     # Fetch the artifacts (a list of (URL, artifact) tuples actually)
-    artifacts = await fetch_pr_sha_artifacts(session, pr, sha)
+    artifactDict = await fetch_pr_sha_artifacts(session, pr, sha)
+    # Merge is deprecated, so leaving as Azure only
+    artifacts = artifactDict["azure"]
     artifacts = [artifact for (URL, artifact) in artifacts if artifact.endswith((".gz", ".bz2"))]
     assert artifacts
 

@@ -3,6 +3,7 @@ import os
 import re
 
 from aiohttp import ClientSession
+from typing import List, Tuple
 from yaml import safe_load
 
 from .common import (
@@ -24,16 +25,23 @@ log = logger.info
 # Given a PR and commit sha, post a comment with any artifacts
 async def make_artifact_comment(session: ClientSession, pr: int, sha: str) -> None:
     artifacts = await fetch_pr_sha_artifacts(session, pr, sha)
+    
+    comment = compose_azure_comment(artifacts["azure"])
+    if len(comment) > 0:
+        comment += "\n\n"
+    comment += compose_circlci_comment(artifacts["circleci"])
+
+    await send_comment(session, pr, comment)
+
+def compose_azure_comment(artifacts: List[Tuple[str, str]]) -> str:
     nPackages = len(artifacts)
+    comment = "## Azure\n\n"
 
     if nPackages > 0:
-        comment = "Package(s) built on Azure are ready for inspection:\n\n"
+        comment += "Package(s) built on Azure are ready for inspection:\n\n"
         comment += "Arch | Package | Zip File\n-----|---------|---------\n"
-        install_noarch = ""
-        install_linux = ""
-        install_osx = ""
 
-        # Table of packages and repodata.json
+        # Table of packages and zips
         for URL, artifact in artifacts:
             if not (package_match := re.match(r"^((.+)\/(.+)\/(.+)\/(.+\.tar\.bz2))$", artifact)):
                 continue
@@ -61,9 +69,9 @@ async def make_artifact_comment(session: ClientSession, pr: int, sha: str) -> No
         comment += "```\nconda install -c ./packages <package name>\n```\n"
 
         # Table of containers
-        comment += "***\n\nDocker image(s) built (images are in the LinuxArtifacts zip file above):\n\n"
-        comment += "Package | Tag | Install with `docker`\n"
-        comment += "--------|-----|----------------------\n"
+        imageHeader = "***\n\nDocker image(s) built (images for Azure are in the LinuxArtifacts zip file above):\n\n"
+        imageHeader += "Package | Tag | Install with `docker`\n"
+        imageHeader += "--------|-----|----------------------\n"
 
         for URL, artifact in artifacts:
             if artifact.endswith(".tar.gz"):
@@ -72,18 +80,68 @@ async def make_artifact_comment(session: ClientSession, pr: int, sha: str) -> No
                     package_name, tag = image_name.split(':', 1)
                     #image_url = URL[:-3]  # trim off zip from format=
                     #image_url += "file&subPath=%2F{}.tar.gz".format("%2F".join(["images", '%3A'.join([package_name, tag])]))
+                    comment += imageHeader
+                    imageHeader = "" # only add the header for the first image
                     comment += f"{package_name} | {tag} | "
                     comment += f'<details><summary>show</summary>`gzip -dc LinuxArtifacts/images/{image_name}.tar.gz \\| docker load`\n'
         comment += "\n\n"
     else:
-        comment = (
+        comment += (
             "No artifacts found on the most recent Azure build. "
             "Either the build failed, the artifacts have were removed due to age, or the recipe was blacklisted/skipped."
         )
-    await send_comment(session, pr, comment)
+    return comment
 
+def compose_circlci_comment(artifacts: List[Tuple[str, str]]) -> str:
+    nPackages = len(artifacts)
 
-# Post a comment on a given PR with its CircleCI artifacts
+    if nPackages < 1:
+        return ""
+    
+    comment = "## CircleCI\n\n"
+    comment += "Package(s) built on CircleCI are ready for inspection:\n\n"
+    comment += "Arch | Package | Repodata\n-----|---------|---------\n"
+
+    # Table of packages and repodata.json
+    for URL, artifact in artifacts:
+        if not (package_match := re.match(r"^((.+)\/(.+)\/(.+\.tar\.bz2))$", URL)):
+            continue
+        url, basedir, subdir, packageName = package_match.groups()
+        repo_url = "/".join([basedir, subdir, "repodata.json"])
+        conda_install_url = basedir
+
+        if subdir == "noarch":
+            comment += "noarch |"
+        elif subdir == "linux-64":
+            comment += "linux-64 |"
+        elif subdir == "linux-aarch64":
+            comment += "linux-aarch64 |"
+        else:
+            comment += "osx-64 |"
+        comment += f" [{packageName}]({URL}) | [repodata.json]({repo_url})\n"
+
+    # Conda install examples
+    comment += "***\n\nYou may also use `conda` to install these:\n\n"
+    comment += f"```\nconda install -c {conda_install_url} <package name>\n```\n"
+
+    # Table of containers
+    imageHeader = "***\n\nDocker image(s) built:\n\n"
+    imageHeader += "Package | Tag | Install with `docker`\n"
+    imageHeader += "--------|-----|----------------------\n"
+
+    for URL, artifact in artifacts:
+        if artifact.endswith(".tar.gz"):
+            image_name = artifact.split("/").pop()[: -len(".tar.gz")]
+            if ":" in image_name:
+                package_name, tag = image_name.split(":", 1)
+                comment += imageHeader
+                imageHeader = "" # only add the header for the first image
+                comment += f"[{package_name}]({URL}) | {tag} | "
+                comment += f'<details><summary>show</summary>`curl -L "{URL}" \\| gzip -dc \\| docker load`</details>\n'
+    comment += "</details>\n"
+    return comment
+
+# Post a comment on a given PR with its artifacts
 async def artifact_checker(session: ClientSession, issue_number: int) -> None:
     url = f"https://api.github.com/repos/bioconda/bioconda-recipes/pulls/{issue_number}"
     headers = {
