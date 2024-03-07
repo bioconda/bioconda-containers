@@ -26,10 +26,10 @@ log = logger.info
 async def make_artifact_comment(session: ClientSession, pr: int, sha: str) -> None:
     artifacts = await fetch_pr_sha_artifacts(session, pr, sha)
     
-    comment = compose_azure_comment(artifacts["azure"])
+    comment = compose_azure_comment(artifacts["azure"] if "azure" in artifacts else [])
     if len(comment) > 0:
         comment += "\n\n"
-    comment += compose_circlci_comment(artifacts["circleci"])
+    comment += compose_circlci_comment(artifacts["circleci"] if "circleci" in artifacts else [])
 
     await send_comment(session, pr, comment)
 
@@ -88,7 +88,7 @@ def compose_azure_comment(artifacts: List[Tuple[str, str]]) -> str:
     else:
         comment += (
             "No artifacts found on the most recent Azure build. "
-            "Either the build failed, the artifacts have were removed due to age, or the recipe was blacklisted/skipped."
+            "Either the build failed, the artifacts have been removed due to age, or the recipe was blacklisted/skipped."
         )
     return comment
 
