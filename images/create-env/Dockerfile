@@ -40,5 +40,13 @@ RUN \
       >>   /etc/skel/.bashrc
 ENV ENV=/etc/profile.d/conda.sh
 
+RUN echo "umask 022" >> /etc/profile
+RUN echo "umask 022" >> /root/.bashrc
+
+# replace /bin/sh with a wrapper to /bin/bash
+RUN /bin/bash -c "unlink /bin/sh"
+COPY bin-sh-wrapper.sh /bin/sh
+RUN /bin/bash -c "chmod +x /bin/sh"
+
 ENTRYPOINT [ "/opt/create-env/bin/tini", "--", "/opt/create-env/env-execute" ]
 CMD [ "bash" ]

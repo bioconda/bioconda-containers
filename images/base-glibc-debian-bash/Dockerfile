@@ -127,5 +127,14 @@ RUN touch /usr/local/env-activate.sh \
       > /usr/local/env-execute
 
 ENV LANG=C.UTF-8
+
+RUN echo "umask 022" >> /etc/profile
+RUN echo "umask 022" >> /root/.bashrc
+
+# replace /bin/sh with a wrapper to /bin/bash
+RUN /bin/bash -c "unlink /bin/sh"
+COPY bin-sh-wrapper.sh /bin/sh
+RUN /bin/bash -c "chmod +x /bin/sh"
+
 ENTRYPOINT [ "/usr/local/env-execute" ]
 CMD [ "bash" ]
