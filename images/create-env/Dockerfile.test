@@ -29,6 +29,8 @@ RUN set -x && \
       >&2 printf 'found static libraries\n' ; exit 1 \
     ; fi
 
+# Check that the umask allows others to read+execute someoneelse's folders
+RUN [ "$( umask )" = '0022' ]
 
 FROM "${base}" as build_bioconda_package
 RUN set -x && \
