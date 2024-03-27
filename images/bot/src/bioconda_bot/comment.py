@@ -43,7 +43,7 @@ def compose_azure_comment(artifacts: List[Tuple[str, str]]) -> str:
 
         # Table of packages and zips
         for URL, artifact in artifacts:
-            if not (package_match := re.match(r"^((.+)\/(.+)\/(.+)\/(.+\.tar\.bz2))$", artifact)):
+            if not (package_match := re.match(r"^((.+)\/(.+)\/(.+)\/(.+\.conda|.+\.tar\.bz2))$", artifact)):
                 continue
             url, archdir, basedir, subdir, packageName = package_match.groups()
             urlBase = URL[:-3]  # trim off zip from format=
@@ -104,7 +104,7 @@ def compose_circlci_comment(artifacts: List[Tuple[str, str]]) -> str:
 
     # Table of packages and repodata.json
     for URL, artifact in artifacts:
-        if not (package_match := re.match(r"^((.+)\/(.+)\/(.+\.tar\.bz2))$", URL)):
+        if not (package_match := re.match(r"^((.+)\/(.+)\/(.+\.conda|.+\.tar\.bz2))$", URL)):
             continue
         url, basedir, subdir, packageName = package_match.groups()
         repo_url = "/".join([basedir, subdir, "repodata.json"])

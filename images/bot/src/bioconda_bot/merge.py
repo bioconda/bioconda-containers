@@ -179,7 +179,7 @@ async def toggle_visibility(session: ClientSession, container_repo: str) -> None
 #            await sleep(5)
 #        if success:
 #            await toggle_visibility(session, basename.split("%3A")[0])
-#    elif x.endswith(".bz2"):
+#    elif x.endswith((".conda", ".tar.bz2")):
 #        # Package
 #        log("uploading package")
 #        ANACONDA_TOKEN = os.environ["ANACONDA_TOKEN"]
@@ -255,7 +255,7 @@ async def extract_and_upload(session: ClientSession, fName: str) -> int:
     if os.path.exists(fName):
         zf = ZipFile(fName)
         for e in zf.infolist():
-            if e.filename.endswith('.tar.bz2'):
+            if e.filename.endswith((".conda", ".tar.bz2")):
                 await upload_package(session, zf, e)
             elif e.filename.endswith('.tar.gz'):
                 await upload_image(session, zf, e)
@@ -274,7 +274,11 @@ async def upload_artifacts(session: ClientSession, pr: int) -> str:
     artifactDict = await fetch_pr_sha_artifacts(session, pr, sha)
     # Merge is deprecated, so leaving as Azure only
     artifacts = artifactDict["azure"]
-    artifacts = [artifact for (URL, artifact) in artifacts if artifact.endswith((".gz", ".bz2"))]
+    artifacts = [
+        artifact
+        for (URL, artifact) in artifacts
+        if artifact.endswith((".gz", ".conda", ".tar.bz2"))
+    ]
     assert artifacts
 
     # Download/upload Artifacts
