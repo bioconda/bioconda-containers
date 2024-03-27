@@ -85,7 +85,11 @@ async def get_pr_info(session: ClientSession, pr: int) -> Any:
 
 def list_zip_contents(fname: str) -> [str]:
     f = ZipFile(fname)
-    return [e.filename for e in f.infolist() if e.filename.endswith('.tar.gz') or e.filename.endswith('.tar.bz2')]
+    return [
+        e.filename
+        for e in f.infolist()
+        if e.filename.endswith((".tar.gz", ".conda", ".tar.bz2"))
+    ]
 
 
 # Download a zip file from url to zipName.zip and return that path
@@ -165,7 +169,7 @@ async def fetch_circleci_artifacts(session: ClientSession, workflowId: str) -> [
                 for artifact in res_object["items"]:
                     zipUrl = artifact["url"]
                     pkg = artifact["path"]
-                    if zipUrl.endswith(".tar.bz2"): # (currently excluding container images) or zipUrl.endswith(".tar.gz"):
+                    if zipUrl.endswith((".conda", ".tar.bz2")): # (currently excluding container images) or zipUrl.endswith(".tar.gz"):
                         artifacts.append((zipUrl, pkg))
         return artifacts
 
