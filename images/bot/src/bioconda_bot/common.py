@@ -116,7 +116,7 @@ async def fetch_azure_zip_files(session: ClientSession, buildId: str) -> [(str, 
     log("contacting azure %s", url)
     async with session.get(url) as response:
         # Sometimes we get a 301 error, so there are no longer artifacts available
-        if response.status == 301:
+        if response.status == 301 or response.status == 404:
             return artifacts
         res = await response.text()
 

@@ -26,10 +26,11 @@ log = logger.info
 async def make_artifact_comment(session: ClientSession, pr: int, sha: str) -> None:
     artifactDict = await fetch_pr_sha_artifacts(session, pr, sha)
     
-    comment = "Package(s) built are ready for inspection:\n\n"
-    comment += "Arch | Package | Zip File / Repodata | CI | Instructions\n"
-    comment += "-----|---------|---------|-----|---------\n"
+    header = "Package(s) built are ready for inspection:\n\n"
+    header += "Arch | Package | Zip File / Repodata | CI | Instructions\n"
+    header += "-----|---------|---------|-----|---------\n"
 
+    comment = ""
     # Table of packages and zips
     for [ci_platform, artifacts] in artifactDict.items():
         if ci_platform == "azure":
@@ -38,6 +39,11 @@ async def make_artifact_comment(session: ClientSession, pr: int, sha: str) -> No
             comment += compose_circlci_comment(artifacts)
         elif ci_platform == "github-actions":
             comment += compose_gha_comment(artifacts)
+    if len(comment) == 0:
+        comment = ( "No artifacts found on the most recent builds. "
+            "Either the builds failed, the artifacts have been removed due to age, or the recipe was blacklisted/skipped.")
+    else:
+        comment = header + comment
 
     # Table of containers
     imageHeader = "***\n\nDocker image(s) built:\n\n"
