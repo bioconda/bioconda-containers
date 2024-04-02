@@ -6,7 +6,7 @@ from asyncio import gather, sleep
 from asyncio.subprocess import create_subprocess_exec
 from pathlib import Path
 from shutil import which
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, Mapping
 from zipfile import ZipFile
 
 from aiohttp import ClientSession
@@ -94,8 +94,8 @@ def list_zip_contents(fname: str) -> [str]:
 
 # Download a zip file from url to zipName.zip and return that path
 # Timeout is 30 minutes to compensate for any network issues
-async def download_file(session: ClientSession, zipName: str, url: str) -> str:
-    async with session.get(url, timeout=60*30) as response:
+async def download_file(session: ClientSession, zipName: str, url: str, headers: Optional[Mapping[str, str]] = None) -> str:
+    async with session.get(url, timeout=60*30, headers=headers) as response:
         if response.status == 200:
             ofile = f"{zipName}.zip"
             with open(ofile, 'wb') as fd:
@@ -173,6 +173,46 @@ async def fetch_circleci_artifacts(session: ClientSession, workflowId: str) -> [
                         artifacts.append((zipUrl, pkg))
         return artifacts
 
+
+# Find artifact zip files, download them and return their URLs and contents
+async def fetch_gha_zip_files(session: ClientSession, workflowId: str) -> [(str, str)]:
+    artifacts = []
+    token = os.environ["BOT_TOKEN"]
+    headers = {
+        "Authorization": f"token {token}",
+        "User-Agent": "BiocondaCommentResponder",
+    }
+    # GitHub Actions uses two different URLs, one for downloading from a browser and another for API downloads
+    url = f"https://api.github.com/repos/bioconda/bioconda-recipes/actions/runs/{workflowId}/artifacts"
+    log("contacting github actions %s", url)
+    async with session.get(url, headers=headers) as response:
+        # Sometimes we get a 301 error, so there are no longer artifacts available
+        if response.status == 301:
+            return artifacts
+        res = await response.text()
+
+    res_object = safe_load(res)
+    if res_object['total_count'] == 0:
+        return artifacts
+
+    for artifact in res_object['artifacts']:
+        zipName = artifact['name']
+        zipUrl = artifact['archive_download_url']
+        log(f"zip name is {zipName} url {zipUrl}")
+        fname = await download_file(session, zipName, zipUrl, headers)
+        if not fname:
+            continue
+        pkgsImages = list_zip_contents(fname)
+        commentZipUrl = f"https://github.com/bioconda/bioconda-recipes/actions/runs/{workflowId}/artifacts/{artifact['id']}"
+        for pkg in pkgsImages:
+            artifacts.append((commentZipUrl, pkg))
+
+    return artifacts
+
+def parse_gha_build_id(url: str) -> str:
+    return re.search("runs/(\d+)/", url).group(1)
+
+
 # Given a PR and commit sha, fetch a list of the artifact zip files URLs and their contents
 async def fetch_pr_sha_artifacts(session: ClientSession, pr: int, sha: str) -> Dict[str, List[Tuple[str, str]]]:
     url = f"https://api.github.com/repos/bioconda/bioconda-recipes/commits/{sha}/check-runs"
@@ -206,6 +246,14 @@ async def fetch_pr_sha_artifacts(session: ClientSession, pr: int, sha: str) -> D
             workflowId = safe_load(check_run["external_id"])["workflow-id"]
             zipFiles = await fetch_circleci_artifacts(session, workflowId)
             artifact_sources["circleci"] = zipFiles  # We've already fetched all possible artifacts from CircleCI
+        elif (
+            "github-actions" not in artifact_sources and 
+            check_run["app"]["slug"] == "github-actions"
+        ):
+            # GitHub Actions builds
+            buildID = parse_gha_build_id(check_run["details_url"])
+            zipFiles = await fetch_gha_zip_files(session, buildID)
+            artifact_sources["github-actions"] = zipFiles  # We've already fetched all possible artifacts from GitHub Actions
 
     return artifact_sources
 
