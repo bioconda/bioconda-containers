@@ -24,72 +24,71 @@ log = logger.info
 
 # Given a PR and commit sha, post a comment with any artifacts
 async def make_artifact_comment(session: ClientSession, pr: int, sha: str) -> None:
-    artifacts = await fetch_pr_sha_artifacts(session, pr, sha)
+    artifactDict = await fetch_pr_sha_artifacts(session, pr, sha)
     
-    comment = compose_azure_comment(artifacts["azure"] if "azure" in artifacts else [])
-    if len(comment) > 0:
-        comment += "\n\n"
-    comment += compose_circlci_comment(artifacts["circleci"] if "circleci" in artifacts else [])
+    header = "Package(s) built are ready for inspection:\n\n"
+    header += "Arch | Package | Zip File / Repodata | CI | Instructions\n"
+    header += "-----|---------|---------|-----|---------\n"
 
-    await send_comment(session, pr, comment)
+    comment = ""
+    # Table of packages and zips
+    for [ci_platform, artifacts] in artifactDict.items():
+        if ci_platform == "azure":
+            comment += compose_azure_comment(artifacts)
+        elif ci_platform == "circleci":
+            comment += compose_circlci_comment(artifacts)
+        elif ci_platform == "github-actions":
+            comment += compose_gha_comment(artifacts)
+    if len(comment) == 0:
+        comment = ( "No artifacts found on the most recent builds. "
+            "Either the builds failed, the artifacts have been removed due to age, or the recipe was blacklisted/skipped.")
+    else:
+        comment = header + comment
 
-def compose_azure_comment(artifacts: List[Tuple[str, str]]) -> str:
-    nPackages = len(artifacts)
-    comment = "## Azure\n\n"
+    # Table of containers
+    imageHeader = "***\n\nDocker image(s) built:\n\n"
+    imageHeader += "Package | Tag | CI | Install with `docker`\n"
+    imageHeader += "---------|---------|-----|---------\n"
 
-    if nPackages > 0:
-        comment += "Package(s) built on Azure are ready for inspection:\n\n"
-        comment += "Arch | Package | Zip File\n-----|---------|---------\n"
-
-        # Table of packages and zips
-        for URL, artifact in artifacts:
-            if not (package_match := re.match(r"^((.+)\/(.+)\/(.+)\/(.+\.conda|.+\.tar\.bz2))$", artifact)):
-                continue
-            url, archdir, basedir, subdir, packageName = package_match.groups()
-            urlBase = URL[:-3]  # trim off zip from format=
-            urlBase += "file&subPath=%2F{}".format("%2F".join([basedir, subdir]))
-            conda_install_url = urlBase
-            # N.B., the zip file URL is nearly identical to the URL for the individual member files. It's unclear if there's an API for getting the correct URL to the files themselves
-            #pkgUrl = "%2F".join([urlBase, packageName])
-            #repoUrl = "%2F".join([urlBase, "current_repodata.json"])
-            #resp = await session.get(repoUrl)
-
-            if subdir == "noarch":
-                comment += "noarch |"
-            elif subdir == "linux-64":
-                comment += "linux-64 |"
-            elif subdir == "linux-aarch64":
-                comment += "linux-aarch64 |"
-            else:
-                comment += "osx-64 |"
-            comment += f" {packageName} | [{archdir}]({URL})\n"
-
-        # Conda install examples
-        comment += "***\n\nYou may also use `conda` to install these after downloading and extracting the appropriate zip file. From the LinuxArtifacts or OSXArtifacts directories:\n\n"
-        comment += "```\nconda install -c ./packages <package name>\n```\n"
-
-        # Table of containers
-        imageHeader = "***\n\nDocker image(s) built (images for Azure are in the LinuxArtifacts zip file above):\n\n"
-        imageHeader += "Package | Tag | Install with `docker`\n"
-        imageHeader += "--------|-----|----------------------\n"
-
+    for [ci_platform, artifacts] in artifactDict.items():
         for URL, artifact in artifacts:
             if artifact.endswith(".tar.gz"):
                 image_name = artifact.split("/").pop()[: -len(".tar.gz")]
                 if ':' in image_name:
                     package_name, tag = image_name.split(':', 1)
-                    #image_url = URL[:-3]  # trim off zip from format=
-                    #image_url += "file&subPath=%2F{}.tar.gz".format("%2F".join(["images", '%3A'.join([package_name, tag])]))
                     comment += imageHeader
                     imageHeader = "" # only add the header for the first image
-                    comment += f"{package_name} | {tag} | "
-                    comment += f'<details><summary>show</summary>`gzip -dc LinuxArtifacts/images/{image_name}.tar.gz \\| docker load`\n'
-        comment += "\n\n"
-    else:
-        comment += (
-            "No artifacts found on the most recent Azure build. "
-            "Either the build failed, the artifacts have been removed due to age, or the recipe was blacklisted/skipped."
-        )
+                    if ci_platform == "azure":
+                        comment += f"{package_name} | {tag} | Azure | "
+                        comment += "<details><summary>show</summary>Images for Azure are in the LinuxArtifacts zip file above."
+                        comment += f"`gzip -dc LinuxArtifacts/images/{image_name}.tar.gz \\| docker load`</details>\n"
+                    elif ci_platform == "circleci":
+                        comment += f"[{package_name}]({URL}) | {tag} | CircleCI | "
+                        comment += f'<details><summary>show</summary>`curl -L "{URL}" \\| gzip -dc \\| docker load`</details>\n'
+    comment += "\n\n"
+    
+    await send_comment(session, pr, comment)
+
+def compose_azure_comment(artifacts: List[Tuple[str, str]]) -> str:
+    nPackages = len(artifacts)
+
+    if nPackages < 1:
+        return ""
+    
+    comment = ""
+    # Table of packages and zips
+    for URL, artifact in artifacts:
+        if not (package_match := re.match(r"^((.+)\/(.+)\/(.+)\/(.+\.conda|.+\.tar\.bz2))$", artifact)):
+            continue
+        url, archdir, basedir, subdir, packageName = package_match.groups()
+
+        comment += f"{subdir} | {packageName} | [{archdir}.zip]({URL}) | Azure | "
+        comment += f'<details><summary>show</summary>'
+        # Conda install examples
+        comment += f"You may also use `conda` to install after downloading and extracting the zip file. From the {archdir} directory: "
+        comment += "`conda install -c ./packages <package name>`"
+        comment +='</details>\n'
+
     return comment
 
 def compose_circlci_comment(artifacts: List[Tuple[str, str]]) -> str:
@@ -97,11 +96,8 @@ def compose_circlci_comment(artifacts: List[Tuple[str, str]]) -> str:
 
     if nPackages < 1:
         return ""
-    
-    comment = "## CircleCI\n\n"
-    comment += "Package(s) built on CircleCI are ready for inspection:\n\n"
-    comment += "Arch | Package | Repodata\n-----|---------|---------\n"
 
+    comment = ""
     # Table of packages and repodata.json
     for URL, artifact in artifacts:
         if not (package_match := re.match(r"^((.+)\/(.+)\/(.+\.conda|.+\.tar\.bz2))$", URL)):
@@ -110,35 +106,34 @@ def compose_circlci_comment(artifacts: List[Tuple[str, str]]) -> str:
         repo_url = "/".join([basedir, subdir, "repodata.json"])
         conda_install_url = basedir
 
-        if subdir == "noarch":
-            comment += "noarch |"
-        elif subdir == "linux-64":
-            comment += "linux-64 |"
-        elif subdir == "linux-aarch64":
-            comment += "linux-aarch64 |"
-        else:
-            comment += "osx-64 |"
-        comment += f" [{packageName}]({URL}) | [repodata.json]({repo_url})\n"
+        comment += f"{subdir} | [{packageName}]({URL}) | [repodata.json]({repo_url}) | CircleCI | "
+        comment += f'<details><summary>show</summary>'
+        # Conda install examples
+        comment += "You may also use `conda` to install:"
+        comment += f"`conda install -c {conda_install_url} <package name>`"
+        comment +='</details>\n'
 
-    # Conda install examples
-    comment += "***\n\nYou may also use `conda` to install these:\n\n"
-    comment += f"```\nconda install -c {conda_install_url} <package name>\n```\n"
+    return comment
 
-    # Table of containers
-    imageHeader = "***\n\nDocker image(s) built:\n\n"
-    imageHeader += "Package | Tag | Install with `docker`\n"
-    imageHeader += "--------|-----|----------------------\n"
+def compose_gha_comment(artifacts: List[Tuple[str, str]]) -> str:
+    nPackages = len(artifacts)
 
+    if nPackages < 1:
+        return ""
+    
+    comment = ""
+    # Table of packages and zips
     for URL, artifact in artifacts:
-        if artifact.endswith(".tar.gz"):
-            image_name = artifact.split("/").pop()[: -len(".tar.gz")]
-            if ":" in image_name:
-                package_name, tag = image_name.split(":", 1)
-                comment += imageHeader
-                imageHeader = "" # only add the header for the first image
-                comment += f"[{package_name}]({URL}) | {tag} | "
-                comment += f'<details><summary>show</summary>`curl -L "{URL}" \\| gzip -dc \\| docker load`</details>\n'
-    comment += "</details>\n"
+        if not (package_match := re.match(r"^((.+)\/(.+)\/(.+\.conda|.+\.tar\.bz2))$", artifact)):
+            continue
+        url, basedir, subdir, packageName = package_match.groups()
+        comment += f"{subdir} | {packageName} | [{subdir}.zip]({URL}) | GitHub Actions | "
+        comment += f'<details><summary>show</summary>'
+        # Conda install examples
+        comment += "You may also use `conda` to install after downloading and extracting the zip file. "
+        comment += "`conda install -c ./packages <package name>`"
+        comment +='</details>\n'
+
     return comment
 
 # Post a comment on a given PR with its artifacts
