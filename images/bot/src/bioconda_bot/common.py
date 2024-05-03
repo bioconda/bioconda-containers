@@ -160,13 +160,13 @@ async def fetch_circleci_artifacts(session: ClientSession, workflowId: str) -> [
         for job in res_wf_object["items"]:
             if job["name"].startswith(f"build_and_test-"):
                 circleci_job_num = job["job_number"]
-                url = f"https://circleci.com/api/v2/project/gh/bioconda/bioconda-recipes/{circleci_job_num}/artifacts"
+                url = f"https://circleci.com/api/v1.1/project/gh/bioconda/bioconda-recipes/{circleci_job_num}/artifacts"
 
                 async with session.get(url) as response:
+                    response.raise_for_status()
                     res = await response.text()
-
                 res_object = safe_load(res)
-                for artifact in res_object["items"]:
+                for artifact in res_object:
                     zipUrl = artifact["url"]
                     pkg = artifact["path"]
                     if zipUrl.endswith((".conda", ".tar.bz2")): # (currently excluding container images) or zipUrl.endswith(".tar.gz"):
