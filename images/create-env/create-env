@@ -1,5 +1,17 @@
 #! /bin/sh -eu
 
+unset \
+  prefix \
+  conda_impl \
+  create_command \
+  env_activate_args \
+  env_activate_file \
+  env_execute_file \
+  remove_paths_globs \
+  strip_files_globs \
+  licenses_path \
+  ;
+
 for arg do
   case "${arg}" in
     --help )
