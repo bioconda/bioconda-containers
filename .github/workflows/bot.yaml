@@ -23,13 +23,37 @@ jobs:
           packages: "anaconda-client skopeo"
         - tag: update
           packages: "git openssh"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
+    container:
+      # travier/podman-action contains newer podman/buildah versions.
+      image: quay.io/travier/podman-action
+      options: --privileged
     env:
       IMAGE_NAME: bot
-      IMAGE_VERSION: '1.3.1'
+      IMAGE_VERSION: '1.4.0'
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
+
+    - name: Install Tools
+      run: |
+        set -eu
+        # jq is not installed in travier/podman-action
+        dnf install -qy \
+          jq
+        rpm -q \
+          buildah podman \
+          coreutils findutils sed \
+          curl jq \
+          | (
+            while read -r line ; do
+              printf %s\\n "${line}"
+              case "${line}" in (*' not installed'*)
+                err=1 ;;
+              esac
+              done
+              exit "${err-0}"
+          )
 
     - name: Build
       id: buildah-build
@@ -63,35 +87,35 @@ jobs:
         done
         buildah rmi --prune || true
 
-    #- name: Check Tags
-    #  run: |
-    #    # FIX upstream: Quay.io does not support immutable images currently.
-    #    #               => Try to use the REST API to check for duplicate tags.
-    #    respone="$(
-    #      curl -sL \
-    #        'https://quay.io/api/v1/repository/bioconda/${{ steps.buildah-build.outputs.image }}/image'
-    #      )"
+    - name: Check Tags
+      run: |
+        # FIX upstream: Quay.io does not support immutable images currently.
+        #               => Try to use the REST API to check for duplicate tags.
+        respone="$(
+          curl -sL \
+            'https://quay.io/api/v1/repository/bioconda/${{ steps.buildah-build.outputs.image }}/tag/'
+          )"
 
-    #    existing_tags="$(
-    #      printf %s "${respone}" \
-    #        | jq -r '.images[].tags[]'
-    #      )" \
-    #      || {
-    #        printf %s\\n \
-    #          'Could not get list of image tags.' \
-    #          'Does the repository exist on Quay.io?' \
-    #          'Quay.io REST API response was:' \
-    #          "${respone}"
-    #        exit 1
-    #      }
-    #    for tag in ${{ steps.buildah-build.outputs.tags }} ; do
-    #      if [ \! "${tag}" = '${{ matrix.tag }}' ] ; then
-    #        if printf %s "${existing_tags}" | grep -qxF "${tag}" ; then
-    #          printf 'Tag %s already exists!\n' "${tag}"
-    #          exit 1
-    #        fi
-    #      fi
-    #    done
+        existing_tags="$(
+          printf %s "${respone}" \
+            | jq -r '.tags[]|select(.end_ts == null or .end_ts >= now)|.name'
+          )" \
+          || {
+            printf %s\\n \
+              'Could not get list of image tags.' \
+              'Does the repository exist on Quay.io?' \
+              'Quay.io REST API response was:' \
+              "${respone}"
+            exit 1
+          }
+        for tag in ${{ steps.buildah-build.outputs.tags }} ; do
+          if [ \! "${tag}" = '${{ matrix.tag }}' ] ; then
+            if printf %s "${existing_tags}" | grep -qxF "${tag}" ; then
+              printf 'Tag %s already exists!\n' "${tag}"
+              exit 1
+            fi
+          fi
+        done
 
     - if: ${{ github.ref == 'refs/heads/main' }}
       name: Push
