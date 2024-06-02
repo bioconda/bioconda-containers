@@ -68,9 +68,10 @@ end-of-help
       licenses_path="${arg#--licenses-path=}"
       shift ;;
     -- )
+      shift
       break ;;
     -* )
-      printf 'unknown option: %s\n' "${arg}"
+      printf 'unknown option: %s\n' "${arg}" 1>&2
       exit 1 ;;
     * )
       break
