@@ -1,4 +1,4 @@
-ARG base=quay.io/bioconda/base-glibc-busybox-bash:2.1.0
+ARG base=quay.io/bioconda/base-glibc-busybox-bash:latest
 
 FROM quay.io/bioconda/create-env as build
 ## If gettext pulls in libxml2, use one that doesn't bloat the image with ICU.
@@ -18,13 +18,11 @@ FROM quay.io/bioconda/create-env as build
 #    && \
 #    conda-build -m .ci_support/linux_64_.yaml recipe/
 ARG packages=
-ARG python=3.8
 ARG prefix=/usr/local
 RUN . /opt/create-env/env-activate.sh && \
     export CONDA_ADD_PIP_AS_PYTHON_DEPENDENCY=0 \
     && \
     create-env \
-        --conda=mamba \
         --strip-files=\* \
         --remove-paths=\*.a \
         --remove-paths=\*.c \
@@ -43,10 +41,9 @@ RUN . /opt/create-env/env-activate.sh && \
         --channel=conda-forge \
         --override-channels \
         pip wheel setuptools \
-        python="${python}" \
+        python\>=3.8 \
         aiohttp \
         ca-certificates \
-        idna\<3 \
         pyyaml \
         ${packages} \
     && \
