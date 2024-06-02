@@ -235,6 +235,16 @@ if [ -n "${licenses_path}" ] ; then
           printf 'failed to copy licenses for %s\n' "${pkg}" 1>&2
           exit 1
         }
+      # Workaround https://github.com/conda/conda-build/issues/5330 :
+      # As of conda-build<=24.5, "info" files like "info/licenses/*" retain their original
+      # permissions which leads to downstream issues if they are too restrictive.
+      # => Fix permissions like conda_build.post.fix_permissions does for package content files.
+      if [ -d "${abs_licenses_path}/${pkg}" ] ; then
+        find "${abs_licenses_path}/${pkg}" \
+          -exec chmod 'u+rw,g+rw,o+r' {} \; \
+          -perm -u=x \
+          -exec chmod 'g+x,o+x' {} \;
+      fi
     done
   )
 fi
