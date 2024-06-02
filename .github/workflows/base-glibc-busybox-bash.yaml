@@ -14,23 +14,47 @@ on:
 jobs:
   build:
     name: Build & Push
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
+    container:
+      # travier/podman-action contains newer podman/buildah versions.
+      image: quay.io/travier/podman-action
+      options: --privileged
     env:
       # The base image is not intended to change often and should be used with
       # version tags or checksum IDs, but not via "latest".
       MAJOR_VERSION: 3
-      MINOR_VERSION: 0
+      MINOR_VERSION: 1
       IMAGE_NAME: base-glibc-busybox-bash
       BUSYBOX_VERSION: '1.36.1'
-      DEBIAN_VERSION: '12.2'
+      DEBIAN_VERSION: '12.5'
 
     steps:
     - uses: actions/checkout@v4
 
     - name: Set up QEMU
-      uses: docker/setup-qemu-action@v2
-      with:
-        platforms: arm64
+      run: |
+        podman run --rm --privileged \
+          docker.io/tonistiigi/binfmt --install arm64
+
+    - name: Install Tools
+      run: |
+        set -eu
+        # jq is not installed in travier/podman-action
+        dnf install -qy \
+          jq
+        rpm -q \
+          buildah podman \
+          coreutils findutils sed \
+          curl jq \
+          | (
+            while read -r line ; do
+              printf %s\\n "${line}"
+              case "${line}" in (*' not installed'*)
+                err=1 ;;
+              esac
+              done
+              exit "${err-0}"
+          )
 
     - name: Build
       id: build
