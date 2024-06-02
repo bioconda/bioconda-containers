@@ -32,6 +32,12 @@ jobs:
       with:
         platforms: arm64
 
+    - name: Info
+      run: |
+        set -xeu
+        podman --version
+        buildah --version
+
     - name: Build
       id: build
       run: |
