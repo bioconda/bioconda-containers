@@ -144,9 +144,14 @@ def parse_azure_build_id(url: str) -> str:
 # Find artifact zip files, download them and return their URLs and contents
 async def fetch_circleci_artifacts(session: ClientSession, workflowId: str) -> [(str, str)]:
     artifacts = []
+    token = os.environ["CIRCLECI_TOKEN"]
+    headers = {
+        "Circle-Token": token,
+        "User-Agent": "BiocondaCommentResponder",
+    }
 
     url_wf = f"https://circleci.com/api/v2/workflow/{workflowId}/job"
-    async with session.get(url_wf) as response:
+    async with session.get(url_wf, headers=headers) as response:
         # Sometimes we get a 301 error, so there are no longer artifacts available
         if response.status == 301:
             return artifacts
@@ -160,13 +165,13 @@ async def fetch_circleci_artifacts(session: ClientSession, workflowId: str) -> [
         for job in res_wf_object["items"]:
             if job["name"].startswith(f"build_and_test-"):
                 circleci_job_num = job["job_number"]
-                url = f"https://circleci.com/api/v1.1/project/gh/bioconda/bioconda-recipes/{circleci_job_num}/artifacts"
+                url = f"https://circleci.com/api/v2/project/gh/bioconda/bioconda-recipes/{circleci_job_num}/artifacts"
 
-                async with session.get(url) as response:
+                async with session.get(url, headers=headers) as response:
                     response.raise_for_status()
                     res = await response.text()
                 res_object = safe_load(res)
-                for artifact in res_object:
+                for artifact in res_object["items"]:
                     zipUrl = artifact["url"]
                     pkg = artifact["path"]
                     if zipUrl.endswith((".conda", ".tar.bz2")): # (currently excluding container images) or zipUrl.endswith(".tar.gz"):

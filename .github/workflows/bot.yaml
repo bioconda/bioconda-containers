@@ -30,7 +30,7 @@ jobs:
       options: --privileged
     env:
       IMAGE_NAME: bot
-      IMAGE_VERSION: '1.4.0'
+      IMAGE_VERSION: '1.4.1'
 
     steps:
     - uses: actions/checkout@v4
