@@ -49,22 +49,30 @@ async def make_artifact_comment(session: ClientSession, pr: int, sha: str) -> No
     imageHeader = "***\n\nDocker image(s) built:\n\n"
     imageHeader += "Package | Tag | CI | Install with `docker`\n"
     imageHeader += "---------|---------|-----|---------\n"
-
     for [ci_platform, artifacts] in artifactDict.items():
         for URL, artifact in artifacts:
             if artifact.endswith(".tar.gz"):
                 image_name = artifact.split("/").pop()[: -len(".tar.gz")]
                 if ':' in image_name:
                     package_name, tag = image_name.split(':', 1)
-                    comment += imageHeader
-                    imageHeader = "" # only add the header for the first image
-                    if ci_platform == "azure":
-                        comment += f"{package_name} | {tag} | Azure | "
-                        comment += "<details><summary>show</summary>Images for Azure are in the LinuxArtifacts zip file above."
-                        comment += f"`gzip -dc LinuxArtifacts/images/{image_name}.tar.gz \\| docker load`</details>\n"
-                    elif ci_platform == "circleci":
-                        comment += f"[{package_name}]({URL}) | {tag} | CircleCI | "
-                        comment += f'<details><summary>show</summary>`curl -L "{URL}" \\| gzip -dc \\| docker load`</details>\n'
+                elif '---' in image_name:
+                    package_name, tag = image_name.split('---', 1)
+                else:
+                    log(f"Skipping image {image_name}: missing separator")
+                    continue
+                comment += imageHeader
+                imageHeader = "" # only add the header for the first image
+                if ci_platform == "azure":
+                    comment += f"{package_name} | {tag} | Azure | "
+                    comment += "<details><summary>show</summary>Images for Azure are in the LinuxArtifacts zip file above."
+                    comment += f"`gzip -dc LinuxArtifacts/images/{image_name}.tar.gz \\| docker load`</details>\n"
+                elif ci_platform == "circleci":
+                    comment += f"[{package_name}]({URL}) | {tag} | CircleCI | "
+                    comment += f'<details><summary>show</summary>`curl -L "{URL}" \\| gzip -dc \\| docker load`</details>\n'
+                elif ci_platform == "github-actions":
+                    comment += f"{package_name} | {tag} | GitHub Actions | "
+                    comment += "<details><summary>show</summary>Images are in the linux-64 zip file above."
+                    comment += f"`gzip -dc images/{image_name}.tar.gz \\| docker load`</details>\n"
     comment += "\n\n"
     
     await send_comment(session, pr, comment)
