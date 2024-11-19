@@ -53,14 +53,15 @@ async def make_artifact_comment(session: ClientSession, pr: int, sha: str) -> No
         for URL, artifact in artifacts:
             if artifact.endswith(".tar.gz"):
                 image_name = artifact.split("/").pop()[: -len(".tar.gz")]
-                comment += imageHeader
-                imageHeader = "" # only add the header for the first image
                 if ':' in image_name:
                     package_name, tag = image_name.split(':', 1)
                 elif '---' in image_name:
                     package_name, tag = image_name.split('---', 1)
                 else:
+                    log(f"Skipping image {image_name}: missing separator")
                     continue
+                comment += imageHeader
+                imageHeader = "" # only add the header for the first image
                 if ci_platform == "azure":
                     comment += f"{package_name} | {tag} | Azure | "
                     comment += "<details><summary>show</summary>Images for Azure are in the LinuxArtifacts zip file above."
