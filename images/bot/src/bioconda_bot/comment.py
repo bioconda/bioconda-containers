@@ -36,7 +36,7 @@ async def make_artifact_comment(session: ClientSession, pr: int, sha: str) -> No
         if ci_platform == "azure":
             comment += compose_azure_comment(artifacts)
         elif ci_platform == "circleci":
-            comment += compose_circlci_comment(artifacts)
+            comment += compose_circleci_comment(artifacts)
         elif ci_platform == "github-actions":
             comment += compose_gha_comment(artifacts)
     if len(comment) == 0:
@@ -99,7 +99,7 @@ def compose_azure_comment(artifacts: List[Tuple[str, str]]) -> str:
 
     return comment
 
-def compose_circlci_comment(artifacts: List[Tuple[str, str]]) -> str:
+def compose_circleci_comment(artifacts: List[Tuple[str, str]]) -> str:
     nPackages = len(artifacts)
 
     if nPackages < 1:
